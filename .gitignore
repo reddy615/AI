@@ -1,0 +1,14 @@
+.venv/
+node_modules/
+dist/
+build/
+coverage/
+logs/
+.env
+.env.*
+*.log
+*.pid
+.pyc
+__pycache__/
+.DS_Store
+Thumbs.db
