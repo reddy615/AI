@@ -73,6 +73,11 @@ app.get('/health', (req, res) => {
 	});
 });
 
+// root health route used by some platforms for basic reachability
+app.get('/', (req, res) => {
+	res.status(200).send('Server running');
+});
+
 app.get('/ready', (req, res) => {
 	res.status(200).json({
 		success: true,

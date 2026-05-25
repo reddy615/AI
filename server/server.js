@@ -9,8 +9,16 @@ const env = loadEnv();
 
 if (env.NODE_ENV === 'production') {
   const insecureSecrets = [env.JWT_SECRET, env.ACCESS_TOKEN_SECRET, env.REFRESH_TOKEN_SECRET].some((secret) => !secret || secret.startsWith('dev_'));
-  if (insecureSecrets) {
-    throw new Error('Production secrets must be set for JWT_SECRET, ACCESS_TOKEN_SECRET, and REFRESH_TOKEN_SECRET');
+  const allowInsecure = Boolean(env.ALLOW_INSECURE_SECRETS);
+
+  if (insecureSecrets && !allowInsecure) {
+    console.error('Production secrets are missing or insecure. Set JWT_SECRET, ACCESS_TOKEN_SECRET, and REFRESH_TOKEN_SECRET in the environment.');
+    console.error('To override for a non-production test deployment, set ALLOW_INSECURE_SECRETS=true (not recommended for real production).');
+    process.exit(1);
+  }
+
+  if (insecureSecrets && allowInsecure) {
+    console.warn('ALLOW_INSECURE_SECRETS=true — starting despite insecure dev secrets. THIS IS NOT RECOMMENDED FOR PRODUCTION.');
   }
 }
 

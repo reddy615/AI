@@ -19,6 +19,7 @@ function loadEnv() {
     GEMINI_MODEL: str({ default: 'gemini-1.5-flash' }),
     OPENAI_EMBEDDING_MODEL: str({ default: 'text-embedding-3-small' }),
     ML_SERVICE_URL: str({ default: '' }),
+    ALLOW_INSECURE_SECRETS: bool({ default: false }),
     JUDGE0_API_URL: str({ default: '' }),
     JUDGE0_API_KEY: str({ default: '' }),
     DEEPGRAM_API_KEY: str({ default: '' }),
