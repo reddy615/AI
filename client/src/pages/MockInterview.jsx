@@ -11,6 +11,7 @@ import {
   getFaceApiModelState,
   isFaceApiReady,
 } from '../services/faceApiService'
+import { getApiBaseUrl } from '../utils/runtimeConfig'
 
 const interviewTypes = [
   { value: 'hr', label: 'HR' },
@@ -85,7 +86,7 @@ export default function MockInterview() {
       socketRef.current = null
     }
 
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+    const socket = io(getApiBaseUrl(), {
       transports: ['websocket'],
       auth: { token: localStorage.getItem('token') },
     })

@@ -10,6 +10,10 @@ npm run dev
 
 Set `VITE_API_URL` in `.env` if backend runs on a different host.
 
+When deploying on Railway, `VITE_API_URL` should point at the public backend
+URL and can be provided as a runtime environment variable for the client
+service.
+
 Stage 2 pages:
 - `/dashboard` — analytics-driven dashboard
 - `/analytics` — performance charts and leaderboard

@@ -49,6 +49,32 @@ docker compose -f ../docker-compose.prod.yml up --build
 
 The FastAPI recommendation service is in `../ml-service/` and can be run independently with Uvicorn.
 
+## Railway deployment notes
+
+When deploying the backend to Railway, set the service root directory to
+`server` so Railway builds from this folder instead of the repository root.
+The backend Dockerfile and startup script already expect to run from here.
+
+Required production environment variables:
+
+- `NODE_ENV=production`
+- `PORT=5000`
+- `MONGO_URI`
+- `JWT_SECRET`
+- `ACCESS_TOKEN_SECRET`
+- `REFRESH_TOKEN_SECRET`
+
+Optional stage 4 variables:
+
+- `REDIS_URL`
+- `ML_SERVICE_URL`
+- `COOKIE_SECURE=true` when serving over HTTPS
+- `COOKIE_DOMAIN` when you need a shared cookie domain
+- `CORS_ORIGIN` should include the frontend Railway URL when the UI is deployed separately
+
+If you deploy the frontend as a separate Railway service, set the frontend's
+`VITE_API_URL` to the public backend URL of this service.
+
 Using Docker for MongoDB (recommended for local testing):
 
 ```bash
