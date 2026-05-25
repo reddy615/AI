@@ -31,6 +31,8 @@ const httpRequestDuration = new client.Histogram({
 
 const app = express();
 
+const path = require('path');
+
 function getCorsOrigins() {
 	return String(process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173')
 		.split(',')
@@ -100,6 +102,24 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/mock-interviews', mockInterviewRoutes);
+
+// Serve frontend static assets when available (single-service deployment)
+const clientDistPath = path.join(__dirname, '../../client/dist');
+try {
+	app.use(express.static(clientDistPath));
+
+	// SPA fallback: serve index.html for non-API GET requests
+	app.get('*', (req, res, next) => {
+		if (req.method !== 'GET') return next();
+		if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+		const indexHtml = path.join(clientDistPath, 'index.html');
+		return res.sendFile(indexHtml, (err) => {
+			if (err) return next();
+		});
+	});
+} catch (e) {
+	// If client build isn't present, ignore — API-only mode
+}
 
 app.use(notFound);
 app.use(errorHandler);

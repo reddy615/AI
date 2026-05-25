@@ -8,6 +8,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "cd ../client && npm install --no-audit --no-fund && npm run build",
     "dev": "nodemon src/index.js",
     "seed": "node scripts/seed.js",
     "start:prod": "pm2 start ecosystem.config.cjs --env production",
