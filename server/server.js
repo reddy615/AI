@@ -5,6 +5,14 @@ const { connectRedis } = require('./src/config/redis');
 const { Server } = require('socket.io');
 
 dotenv.config();
+const defaultMongoUri = 'mongodb://127.0.0.1:27017/ai-interview';
+const hasMongoUri = Boolean(
+  process.env.MONGO_URI
+  && process.env.MONGO_URI.trim()
+  && process.env.MONGO_URI !== defaultMongoUri
+  && !process.env.MONGO_URI.includes('localhost:27017')
+);
+const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim());
 const env = loadEnv();
 
 if (env.NODE_ENV === 'production') {
@@ -49,13 +57,13 @@ function getCorsOrigins() {
 }
 
 const startupTasks = [];
-if (env.MONGO_URI) {
+if (hasMongoUri) {
   startupTasks.push(connectDB());
 } else {
   console.warn('MONGO_URI not set — skipping MongoDB connection.');
 }
 
-if (process.env.REDIS_URL) {
+if (hasRedisUrl) {
   startupTasks.push(connectRedis());
 } else {
   console.warn('REDIS_URL not set — skipping Redis connection.');

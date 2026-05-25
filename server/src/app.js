@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 const mongoSanitize = require('express-mongo-sanitize');
 const xssClean = require('xss-clean');
 const client = require('prom-client');
+const fs = require('fs');
+const path = require('path');
 const morgan = require('./middleware/logger');
 const responseMiddleware = require('./middleware/response');
 const { generalLimiter } = require('./middleware/rateLimiters');
@@ -30,8 +32,6 @@ const httpRequestDuration = new client.Histogram({
 });
 
 const app = express();
-
-const path = require('path');
 
 function getCorsOrigins() {
 	return String(process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173')
@@ -75,9 +75,16 @@ app.get('/health', (req, res) => {
 	});
 });
 
-// root health route used by some platforms for basic reachability
-app.get('/', (req, res) => {
-	res.status(200).send('Server running');
+// Serve the React app at the root when a client build exists.
+app.get('/', (req, res, next) => {
+	const clientIndex = path.join(__dirname, '../../client/dist/index.html');
+	if (fs.existsSync(clientIndex)) {
+		return res.sendFile(clientIndex, (err) => {
+			if (err) return next(err);
+		});
+	}
+
+	return res.status(200).send('Server running');
 });
 
 app.get('/ready', (req, res) => {
