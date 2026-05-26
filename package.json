@@ -1,0 +1,18 @@
+{
+  "name": "ai-interview-platform",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "build": "npm run build --workspace server",
+    "build:client": "npm run build --workspace client",
+    "build:server": "npm run build --workspace server",
+    "start": "npm start --workspace server",
+    "dev": "npm run dev --workspace server"
+  }
+}
