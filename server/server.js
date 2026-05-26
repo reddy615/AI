@@ -16,17 +16,23 @@ const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim(
 const env = loadEnv();
 
 if (env.NODE_ENV === 'production') {
-  const insecureSecrets = [env.JWT_SECRET, env.ACCESS_TOKEN_SECRET, env.REFRESH_TOKEN_SECRET].some((secret) => !secret || secret.startsWith('dev_'));
+  const isDevSecret = (secret) => !secret || secret.startsWith('dev_');
+  const insecureJwtSecret = isDevSecret(env.JWT_SECRET);
+  const missingDedicatedSecrets = isDevSecret(env.ACCESS_TOKEN_SECRET) || isDevSecret(env.REFRESH_TOKEN_SECRET);
   const allowInsecure = Boolean(env.ALLOW_INSECURE_SECRETS);
 
-  if (insecureSecrets && !allowInsecure) {
-    console.error('Production secrets are missing or insecure. Set JWT_SECRET, ACCESS_TOKEN_SECRET, and REFRESH_TOKEN_SECRET in the environment.');
+  if (insecureJwtSecret && !allowInsecure) {
+    console.error('Production JWT_SECRET is missing or insecure. Set JWT_SECRET in the environment.');
     console.error('To override for a non-production test deployment, set ALLOW_INSECURE_SECRETS=true (not recommended for real production).');
     process.exit(1);
   }
 
-  if (insecureSecrets && allowInsecure) {
-    console.warn('ALLOW_INSECURE_SECRETS=true — starting despite insecure dev secrets. THIS IS NOT RECOMMENDED FOR PRODUCTION.');
+  if (insecureJwtSecret && allowInsecure) {
+    console.warn('ALLOW_INSECURE_SECRETS=true — starting despite insecure JWT_SECRET. THIS IS NOT RECOMMENDED FOR PRODUCTION.');
+  }
+
+  if (missingDedicatedSecrets) {
+    console.warn('ACCESS_TOKEN_SECRET and/or REFRESH_TOKEN_SECRET are not set to dedicated production values. Falling back to JWT_SECRET.');
   }
 }
 

@@ -61,6 +61,9 @@ Required production environment variables:
 - `PORT=5000`
 - `MONGO_URI`
 - `JWT_SECRET`
+
+Optional but recommended for token isolation:
+
 - `ACCESS_TOKEN_SECRET`
 - `REFRESH_TOKEN_SECRET`
 
