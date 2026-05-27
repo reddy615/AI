@@ -21,7 +21,7 @@ jobs:
 
       - name: Install client dependencies
         working-directory: client
-        run: npm install
+        run: npm ci
 
       - name: Build client
         working-directory: client
@@ -29,14 +29,14 @@ jobs:
 
       - name: Install server dependencies
         working-directory: server
-        run: npm install
+        run: npm ci
 
       - name: Validate server app
         working-directory: server
         run: node -e "require('./src/app')"
 
       - name: Package deployment artifact
-        run: tar --exclude='release.tar.gz' -czf release.tar.gz server client ml-service deploy docs .github README.md docker-compose.prod.yml
+        run: tar --exclude='release.tar.gz' -czf release.tar.gz server client ml-service deploy README.md docker-compose.prod.yml
 
       - name: Copy artifact to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -45,7 +45,7 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_SSH_KEY }}
           source: release.tar.gz
-          target: /tmp/ai-interview-release
+          target: /tmp/ai-interview-release/release.tar.gz
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -55,12 +55,10 @@ jobs:
           key: ${{ secrets.AWS_EC2_SSH_KEY }}
           script: |
             set -e
+            mkdir -p /var/www/ai-interview
             cd /var/www/ai-interview
             tar -xzf /tmp/ai-interview-release/release.tar.gz -C /var/www/ai-interview --strip-components=1
             cd server
             npm install --omit=dev
             npm run pm2:reload || npm run start:prod
-            cd ../client
-            npm install
-            npm run build
             sudo systemctl reload nginx
