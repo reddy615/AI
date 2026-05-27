@@ -1,0 +1,15 @@
+NODE_ENV=production
+PORT=5000
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority
+REDIS_URL=rediss://:<password>@<host>:<port>
+ML_SERVICE_URL=https://<ml-service>.up.railway.app
+
+JWT_SECRET=replace-with-strong-secret
+ACCESS_TOKEN_SECRET=replace-with-strong-secret
+REFRESH_TOKEN_SECRET=replace-with-strong-secret
+
+CORS_ORIGIN=https://<client>.up.railway.app,https://your-domain.com
+COOKIE_SECURE=true
+COOKIE_DOMAIN=.your-domain.com
+
+VITE_API_URL=https://<server>.up.railway.app

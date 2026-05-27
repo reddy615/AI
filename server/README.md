@@ -59,7 +59,7 @@ Required production environment variables:
 
 - `NODE_ENV=production`
 - `PORT=5000`
-- `MONGO_URI`
+- `MONGO_URI` should point to MongoDB Atlas, not `localhost`
 - `JWT_SECRET`
 
 Optional but recommended for token isolation:
@@ -77,6 +77,9 @@ Optional stage 4 variables:
 
 If you deploy the frontend as a separate Railway service, set the frontend's
 `VITE_API_URL` to the public backend URL of this service.
+
+The recommended Railway backend variable template is in
+`deploy/railway/environment.production.example`.
 
 Using Docker for MongoDB (recommended for local testing):
 

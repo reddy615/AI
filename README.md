@@ -34,7 +34,8 @@ matching subfolder:
 - ML service: `ml-service`
 
 Railway can then use the Dockerfile inside each folder. The backend service
-expects these core environment variables in production:
+expects these core environment variables in production, with `MONGO_URI` set to
+your MongoDB Atlas connection string rather than a local MongoDB host:
 
 - `NODE_ENV=production`
 - `PORT=5000`
@@ -54,3 +55,6 @@ service URL to the backend's `CORS_ORIGIN` value.
 For the client service, set `VITE_API_URL` to the public backend URL, for
 example the Railway URL of the `server` service. The client container now reads
 that value at runtime, so the same image works in Railway and locally.
+
+Use `deploy/railway/environment.production.example` as the starting point for
+the backend service variables.
