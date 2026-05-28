@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
-const { generateModuleQuestions } = require('../seed/questions');
+const { generateModuleQuestions, generateAptitudeQuestionsForTopic, getAptitudeTopics } = require('../seed/questions');
 
 const localQuizQuestionStore = new Map();
 const localQuizAttemptStore = new Map();
@@ -47,6 +47,13 @@ function buildLocalQuizQuestions(module, difficulty, category, count) {
 
   const selectedQuestions = (filteredQuestions.length ? filteredQuestions : sourceQuestions).slice(0, count);
   return selectedQuestions.map((question) => buildLocalQuestionPayload(question, module));
+}
+
+function buildAptitudePracticeQuestions(perTopicCount = 2) {
+  return getAptitudeTopics().flatMap((topic, topicIndex) => {
+    const topicQuestions = generateAptitudeQuestionsForTopic(topicIndex, 80);
+    return topicQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'aptitude'));
+  });
 }
 
 function getLocalQuizQuestion(questionId) {
@@ -131,6 +138,12 @@ async function ensureQuizQuestions(module, match, redis, poolKey) {
 exports.startQuiz = asyncHandler(async (req, res) => {
   const { module = 'aptitude', difficulty, category, count = 10 } = req.query;
   const safeCount = Math.min(Number(count) || 10, 50);
+
+  if (module === 'aptitude') {
+    const payload = buildAptitudePracticeQuestions(2);
+    return res.apiSuccess({ questions: payload, count: payload.length }, 'Quiz loaded');
+  }
+
   const match = { module };
   if (difficulty) match.difficulty = difficulty;
   if (category) match.category = category;
