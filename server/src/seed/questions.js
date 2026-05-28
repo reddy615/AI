@@ -49,6 +49,313 @@ function buildOptions(correctValue) {
   return [String(correctValue), `${correctValue}x`, `not ${correctValue}`, `${correctValue}++`]
 }
 
+function buildAptitudeTopicQuestion(topic, topicIndex, questionIndex) {
+  const difficulty = questionIndex % 3 === 0 ? 'easy' : (questionIndex % 3 === 1 ? 'medium' : 'hard')
+  const seed = (topicIndex + 1) * 11 + questionIndex + 7
+
+  switch (topic.topic) {
+    case 'Percentages': {
+      const value = (seed % 40) + 10
+      const total = (seed + 30) * 2
+      const correct = Math.round((value / 100) * total)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `What is ${value}% of ${total}?`,
+        options: buildOptions(correct).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Use percentage = value / 100 x total.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Ratios and Proportions': {
+      const left = seed + 5
+      const rightMultiplier = (topicIndex % 5) + 2
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `If ${left} is to ${left * rightMultiplier}, what is the ratio in simplest form?`,
+        options: [{ text: `1:${rightMultiplier}` }, { text: `${rightMultiplier}:1` }, { text: `2:${rightMultiplier}` }, { text: `1:${rightMultiplier + 1}` }],
+        correctIndex: 0,
+        explanation: 'Divide both terms by the same factor.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Averages': {
+      const numbers = [seed, seed + 4, seed + 8]
+      const correct = Math.round(numbers.reduce((sum, value) => sum + value, 0) / numbers.length)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the average of ${numbers.join(', ')}.`,
+        options: buildOptions(correct).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Add all values and divide by count.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Profit and Loss': {
+      const cost = seed * 5
+      const profitPercent = (topicIndex % 15) + 5
+      const sell = Math.round(cost + (cost * profitPercent) / 100)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `An item costs ${cost}. If profit is ${profitPercent}%, what is the selling price?`,
+        options: buildOptions(sell).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Selling price = cost price + profit.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Simple Interest': {
+      const principal = seed * 10
+      const rate = (topicIndex % 9) + 3
+      const time = 2
+      const correct = (principal * rate * time) / 100
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the simple interest on ${principal} at ${rate}% for ${time} years.`,
+        options: buildOptions(correct).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'SI = (P x R x T) / 100.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Compound Interest': {
+      const principal = seed * 8
+      const rate = (topicIndex % 7) + 4
+      const amount = Math.round(principal * Math.pow(1 + rate / 100, 2))
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `What is the amount after 2 years on ${principal} at ${rate}% compound interest?`,
+        options: buildOptions(amount).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Use A = P(1 + R/100)^2.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Time, Speed and Distance': {
+      const speed = (topicIndex % 8) + 4
+      const time = (questionIndex % 5) + 2
+      const distance = speed * time
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `A vehicle travels at ${speed} km/h for ${time} hours. What distance does it cover?`,
+        options: buildOptions(distance).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Distance = speed x time.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Time and Work': {
+      const days = (topicIndex % 8) + 2
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `If A can complete a job in ${days} days, what fraction of the work is done in 1 day?`,
+        options: [{ text: `1/${days}` }, { text: `${days}/1` }, { text: `1/${days + 1}` }, { text: `2/${days}` }],
+        correctIndex: 0,
+        explanation: 'One day work is the reciprocal of total days.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Pipes and Cisterns': {
+      const fill = (topicIndex % 8) + 3
+      const drain = (topicIndex % 5) + 1
+      const net = fill - drain
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `A pipe fills a tank in ${fill} hours and a leak empties it in ${drain} hours. What is the net hourly work rate?`,
+        options: buildOptions(net).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Fill rate minus drain rate.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Mixtures and Allegations': {
+      const a = (topicIndex % 9) + 1
+      const b = a + 3
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `What is the ratio of cheaper ingredient to costlier ingredient when mixing values ${a} and ${b}?`,
+        options: [{ text: `${b - a}:${a}` }, { text: `${a}:${b - a}` }, { text: `${a + b}:${b}` }, { text: `${b}:${a}` }],
+        correctIndex: 0,
+        explanation: 'Use allegation difference rule.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Sequences and Series': {
+      const start = (topicIndex % 10) + 2
+      const step = (questionIndex % 4) + 2
+      const next = start + 3 * step
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the next term in the series: ${start}, ${start + step}, ${start + 2 * step}, ___.`,
+        options: buildOptions(next).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'The series increases by a constant difference.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Permutations and Combinations': {
+      const total = (topicIndex % 7) + 4
+      const choose = 2
+      const correct = (total * (total - 1)) / 2
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `How many ways can you choose ${choose} items from ${total} items?`,
+        options: buildOptions(correct).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Use nC2 = n(n-1)/2.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Probability': {
+      const favorable = (topicIndex % 4) + 1
+      const total = favorable * 4
+      const correct = `${favorable}/${total}`
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `What is the probability of an event with ${favorable} favorable outcomes out of ${total} total outcomes?`,
+        options: [{ text: correct }, { text: `${total}/${favorable}` }, { text: `${favorable + 1}/${total}` }, { text: `1/${favorable}` }],
+        correctIndex: 0,
+        explanation: 'Probability = favorable outcomes / total outcomes.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Geometry': {
+      const side = (topicIndex % 9) + 3
+      const area = side * side
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the area of a square with side ${side} units.`,
+        options: buildOptions(area).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Area of square = side x side.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Mensuration': {
+      const radius = (topicIndex % 6) + 2
+      const circumference = Math.round(2 * 3.14 * radius)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the circumference of a circle with radius ${radius} units.`,
+        options: buildOptions(circumference).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Circumference = 2πr.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Data Interpretation': {
+      const sales = [seed, seed + 5, seed + 10]
+      const total = sales.reduce((sum, value) => sum + value, 0)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `A chart shows values ${sales.join(', ')}. What is the total?`,
+        options: buildOptions(total).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Add all chart values.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Number System': {
+      const divisor = (topicIndex % 7) + 2
+      const number = divisor * ((questionIndex % 4) + 5)
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Is ${number} divisible by ${divisor}?`,
+        options: [{ text: 'Yes' }, { text: 'No' }, { text: 'Only sometimes' }, { text: 'Cannot be determined' }],
+        correctIndex: 0,
+        explanation: 'The number is constructed to be divisible.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Algebra': {
+      const x = (topicIndex % 8) + 2
+      const constant = x + 5
+      return {
+        module: 'aptitude',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `If x + 5 = ${constant}, what is the value of x?`,
+        options: buildOptions(x).map((option) => ({ text: option })),
+        correctIndex: 0,
+        explanation: 'Subtract 5 from both sides.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    default:
+      return buildAptitudeQuestion(topicIndex, questionIndex)
+  }
+}
+
 function buildAptitudeQuestion(topicIndex, questionIndex) {
   const topic = topics.aptitude[topicIndex % topics.aptitude.length]
   const difficulty = questionIndex % 3 === 0 ? 'easy' : (questionIndex % 3 === 1 ? 'medium' : 'hard')
@@ -97,11 +404,12 @@ function buildAptitudeQuestion(topicIndex, questionIndex) {
 }
 
 function generateAptitude(i) {
-  return buildAptitudeQuestion(i % topics.aptitude.length, i)
+  const topicIndex = i % topics.aptitude.length
+  return buildAptitudeTopicQuestion(topics.aptitude[topicIndex], topicIndex, i)
 }
 
 function generateAptitudeQuestionsForTopic(topicIndex, count = 80) {
-  return Array.from({ length: count }, (_, questionIndex) => buildAptitudeQuestion(topicIndex, questionIndex))
+  return Array.from({ length: count }, (_, questionIndex) => buildAptitudeTopicQuestion(topics.aptitude[topicIndex % topics.aptitude.length], topicIndex, questionIndex))
 }
 
 function generateAptitudeTopicBank(perTopicCount = 80) {
