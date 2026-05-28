@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../api/api'
 import QuestionCard from '../components/QuestionCard'
 import Sidebar from '../components/Sidebar'
 import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
-import { useNavigate } from 'react-router-dom'
 
 export default function Quiz(){
-  const params = new URLSearchParams(window.location.search)
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
   const module = params.get('module') || 'aptitude'
   const count = params.get('count') || 10
   const difficulty = params.get('difficulty') || ''
@@ -27,9 +28,11 @@ export default function Quiz(){
         const res = await api.get(`/api/quiz/start?module=${module}&count=${count}${difficulty?`&difficulty=${difficulty}`:''}`)
         setQuestions(res.data.questions)
         setLoading(false)
+        setIndex(0)
+        setAnswers({})
       }catch(err){ console.error(err); setLoading(false) }
     })()
-  },[])
+  },[location.search, module, count, difficulty])
 
   const handleSelect = (qid, optionIndex)=>{
     setAnswers(prev=>({ ...prev, [qid]: optionIndex }))
@@ -61,7 +64,13 @@ export default function Quiz(){
             <Timer seconds={duration} onTick={setDuration} onEnd={handleAutoSubmit} ref={timerRef} />
           </div>
         </div>
-        <QuestionCard question={questions[index]} onSelect={handleSelect} selected={answers[questions[index].id]} />
+        <QuestionCard
+          question={questions[index]}
+          onSelect={handleSelect}
+          selected={answers[questions[index].id]}
+          questionNumber={index + 1}
+          totalQuestions={questions.length}
+        />
         <div className="flex justify-between mt-4">
           <button className="btn" onClick={()=>setIndex(i=>Math.max(0,i-1))}>Previous</button>
           <div>

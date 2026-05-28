@@ -52,7 +52,8 @@ function buildLocalQuizQuestions(module, difficulty, category, count) {
 function buildAptitudePracticeQuestions(perTopicCount = 2) {
   return getAptitudeTopics().flatMap((topic, topicIndex) => {
     const topicQuestions = generateAptitudeQuestionsForTopic(topicIndex, 80);
-    return topicQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'aptitude'));
+    const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
+    return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'aptitude'));
   });
 }
 
