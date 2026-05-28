@@ -58,7 +58,7 @@ export default function Result() {
 
   const { attempt, analytics } = data
 
-  if (attempt?.module === 'aptitude' || attempt?.module === 'reasoning') {
+  if (attempt?.module === 'aptitude' || attempt?.module === 'reasoning' || attempt?.module === 'verbal') {
     return (
       <AptitudeResultAnalytics
         attempt={attempt}

@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
-const { generateModuleQuestions, generateAptitudeQuestionsForTopic, generateReasoningQuestionsForTopic, getAptitudeTopics, getReasoningTopics } = require('../seed/questions');
+const { generateModuleQuestions, generateAptitudeQuestionsForTopic, generateReasoningQuestionsForTopic, generateVerbalQuestionsForTopic, getAptitudeTopics, getReasoningTopics } = require('../seed/questions');
 const { localQuizQuestionStore, localQuizAttemptStore } = require('../config/localQuizStore');
 
 function createLocalQuizId(module) {
@@ -65,6 +65,28 @@ function buildReasoningPracticeQuestions(perTopicCount = 2) {
     const topicQuestions = generateReasoningQuestionsForTopic(topic.originalIndex, 80);
     const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
     return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'reasoning'));
+  });
+}
+
+function buildVerbalPracticeQuestions(perTopicCount = 2) {
+  const topicList = generateModuleQuestions('verbal', 80)
+    .reduce((accumulator, question) => {
+      if (!accumulator[question.topic]) {
+        accumulator[question.topic] = [];
+      }
+      accumulator[question.topic].push(question);
+      return accumulator;
+    }, {});
+
+  const topicsToUse = Object.keys(topicList)
+    .map((topic, originalIndex) => ({ topic, originalIndex }))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 18);
+
+  return topicsToUse.flatMap((entry) => {
+    const topicQuestions = generateVerbalQuestionsForTopic(entry.originalIndex, 80);
+    const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
+    return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'verbal'));
   });
 }
 
@@ -164,6 +186,11 @@ exports.startQuiz = asyncHandler(async (req, res) => {
 
   if (module === 'reasoning') {
     const payload = buildReasoningPracticeQuestions(2);
+    return res.apiSuccess({ questions: payload, count: payload.length }, 'Quiz loaded');
+  }
+
+  if (module === 'verbal') {
+    const payload = buildVerbalPracticeQuestions(2);
     return res.apiSuccess({ questions: payload, count: payload.length }, 'Quiz loaded');
   }
 

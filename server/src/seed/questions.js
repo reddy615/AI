@@ -44,9 +44,24 @@ const topics = {
   ],
   verbal: [
     { category: 'Vocabulary', topic: 'Synonyms' },
-    { category: 'Grammar', topic: 'Error Spotting' },
-    { category: 'Reading', topic: 'Comprehension' },
     { category: 'Vocabulary', topic: 'Antonyms' },
+    { category: 'Grammar', topic: 'Error Spotting' },
+    { category: 'Grammar', topic: 'Fill in the Blanks' },
+    { category: 'Grammar', topic: 'Sentence Improvement' },
+    { category: 'Grammar', topic: 'Sentence Completion' },
+    { category: 'Usage', topic: 'Idioms and Phrases' },
+    { category: 'Usage', topic: 'One Word Substitution' },
+    { category: 'Usage', topic: 'Phrasal Verbs' },
+    { category: 'Reading', topic: 'Comprehension' },
+    { category: 'Reading', topic: 'Cloze Test' },
+    { category: 'Grammar', topic: 'Active and Passive Voice' },
+    { category: 'Grammar', topic: 'Direct and Indirect Speech' },
+    { category: 'Grammar', topic: 'Tenses' },
+    { category: 'Grammar', topic: 'Articles' },
+    { category: 'Grammar', topic: 'Prepositions' },
+    { category: 'Grammar', topic: 'Conjunctions' },
+    { category: 'Reading', topic: 'Paragraph Rearrangement' },
+    { category: 'Usage', topic: 'Spelling' },
   ],
 }
 
@@ -734,6 +749,285 @@ function generateReasoningTopicBank(perTopicCount = 80) {
   return topics.reasoning.flatMap((_, topicIndex) => generateReasoningQuestionsForTopic(topicIndex, perTopicCount))
 }
 
+function buildVerbalQuestion(topicIndex, questionIndex) {
+  const topic = topics.verbal[topicIndex % topics.verbal.length]
+  const difficulty = questionIndex % 3 === 0 ? 'easy' : (questionIndex % 3 === 1 ? 'medium' : 'hard')
+  const variant = questionIndex % 2
+  const word = vocab[(topicIndex + questionIndex) % vocab.length]
+  const synonym = synonyms[word]
+
+  switch (topic.topic) {
+    case 'Synonyms':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? `Choose the synonym of '${word}'.` : `Choose the synonym of '${vocab[(topicIndex + 3) % vocab.length]}'.`,
+        options: variant === 0 ? [{ text: synonym }, { text: 'sad' }, { text: 'slow' }, { text: 'bright' }] : [{ text: synonyms[vocab[(topicIndex + 3) % vocab.length]] }, { text: 'cold' }, { text: 'rough' }, { text: 'dark' }],
+        correctIndex: 0,
+        explanation: `The synonym of ${word} is ${synonym}.`,
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0,
+      }
+    case 'Antonyms':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? `Choose the antonym of '${word}'.` : `Choose the antonym of '${vocab[(topicIndex + 2) % vocab.length]}'.`,
+        options: variant === 0 ? [{ text: 'small' }, { text: 'large' }, { text: 'tiny' }, { text: 'mini' }] : [{ text: 'hot' }, { text: 'warm' }, { text: 'cool' }, { text: 'neutral' }],
+        correctIndex: variant === 0 ? 1 : 0,
+        explanation: 'Pick the opposite meaning.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0,
+      }
+    case 'Error Spotting':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Identify the incorrect part: She do not like apples.' : 'Identify the incorrect part: He go to school every day.',
+        options: variant === 0 ? [{ text: 'She' }, { text: 'do not' }, { text: 'like apples' }, { text: 'No error' }] : [{ text: 'He' }, { text: 'go' }, { text: 'to school' }, { text: 'every day' }],
+        correctIndex: 1,
+        explanation: 'Choose the part with the grammatical error.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Fill in the Blanks':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'She _____ to the market yesterday.' : 'They _____ the match last week.',
+        options: variant === 0 ? [{ text: 'went' }, { text: 'goes' }, { text: 'gone' }, { text: 'going' }] : [{ text: 'won' }, { text: 'win' }, { text: 'wins' }, { text: 'winning' }],
+        correctIndex: 0,
+        explanation: 'Use the past tense form.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Sentence Improvement':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'He is knowing the answer.' : 'She has went home already.',
+        options: variant === 0 ? [{ text: 'He knows the answer.' }, { text: 'He is know the answer.' }, { text: 'He knew the answer.' }, { text: 'No change needed.' }] : [{ text: 'She has gone home already.' }, { text: 'She had went home already.' }, { text: 'She is gone home already.' }, { text: 'No change needed.' }],
+        correctIndex: 0,
+        explanation: 'Choose the grammatically improved sentence.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Sentence Completion':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Despite the rain, the event continued ____.' : 'The manager was pleased with the team’s ____ performance.',
+        options: variant === 0 ? [{ text: 'smoothly' }, { text: 'stormily' }, { text: 'slowly' }, { text: 'quietly' }] : [{ text: 'excellent' }, { text: 'average' }, { text: 'ordinary' }, { text: 'weak' }],
+        correctIndex: 0,
+        explanation: 'Choose the word that best completes the sentence.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Idioms and Phrases':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'What does the idiom "once in a blue moon" mean?' : 'What does the phrase "spill the beans" mean?',
+        options: variant === 0 ? [{ text: 'Very rarely' }, { text: 'At midnight' }, { text: 'A blue object' }, { text: 'Very often' }] : [{ text: 'Reveal a secret' }, { text: 'Cook beans' }, { text: 'Waste time' }, { text: 'Make noise' }],
+        correctIndex: 0,
+        explanation: 'Select the correct idiomatic meaning.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'One Word Substitution':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'A person who loves books is called a ____.' : 'A place where animals are kept is called a ____.',
+        options: variant === 0 ? [{ text: 'bibliophile' }, { text: 'biologist' }, { text: 'musician' }, { text: 'chef' }] : [{ text: 'zoo' }, { text: 'factory' }, { text: 'library' }, { text: 'garden' }],
+        correctIndex: 0,
+        explanation: 'Choose the single word that matches the definition.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Phrasal Verbs':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'She will look after the children. What does "look after" mean?' : 'He gave up the challenge. What does "gave up" mean?',
+        options: variant === 0 ? [{ text: 'Take care of' }, { text: 'Ignore' }, { text: 'Observe' }, { text: 'Watch from far' }] : [{ text: 'Quit' }, { text: 'Begin' }, { text: 'Win' }, { text: 'Delay' }],
+        correctIndex: 0,
+        explanation: 'Identify the phrasal verb meaning.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Comprehension':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Passage: The company introduced flexible hours. What was the main change?' : 'Passage: The student read daily and improved steadily. What helped the student improve?',
+        options: variant === 0 ? [{ text: 'Flexible working hours' }, { text: 'More breaks' }, { text: 'New office' }, { text: 'Less pay' }] : [{ text: 'Daily reading practice' }, { text: 'Luck' }, { text: 'Random guessing' }, { text: 'Less study' }],
+        correctIndex: 0,
+        explanation: 'Answer based on the passage.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Cloze Test':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'The sun rises in the ____.' : 'She completed the task with ____ and care.',
+        options: variant === 0 ? [{ text: 'east' }, { text: 'west' }, { text: 'north' }, { text: 'south' }] : [{ text: 'speed' }, { text: 'anger' }, { text: 'noise' }, { text: 'confusion' }],
+        correctIndex: 0,
+        explanation: 'Choose the word that fits best.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Active and Passive Voice':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Change to passive voice: The chef prepared the meal.' : 'Change to active voice: The letter was written by Ana.',
+        options: variant === 0 ? [{ text: 'The meal was prepared by the chef.' }, { text: 'The meal prepared the chef.' }, { text: 'The chef is preparing the meal.' }, { text: 'The meal has prepared the chef.' }] : [{ text: 'Ana wrote the letter.' }, { text: 'Ana writes the letter.' }, { text: 'Ana is writing the letter.' }, { text: 'The letter wrote Ana.' }],
+        correctIndex: 0,
+        explanation: 'Convert the sentence voice correctly.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Direct and Indirect Speech':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Convert to indirect speech: She said, "I am ready."' : 'Convert to indirect speech: He said, "I will call you."',
+        options: variant === 0 ? [{ text: 'She said that she was ready.' }, { text: 'She says that she is ready.' }, { text: 'She said that I was ready.' }, { text: 'She said that she is ready.' }] : [{ text: 'He said that he would call me.' }, { text: 'He said that he will call me.' }, { text: 'He says that he would call me.' }, { text: 'He said that I would call him.' }],
+        correctIndex: 0,
+        explanation: 'Change pronouns and tense appropriately.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Tenses':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Choose the correct tense: By next year, I ____ my degree.' : 'Choose the correct tense: She ____ in this office since 2020.',
+        options: variant === 0 ? [{ text: 'will have completed' }, { text: 'completed' }, { text: 'complete' }, { text: 'completing' }] : [{ text: 'has worked' }, { text: 'worked' }, { text: 'will work' }, { text: 'is working' }],
+        correctIndex: 0,
+        explanation: 'Select the tense that matches the timeline.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Articles':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'He bought ____ umbrella.' : 'She is ____ honest student.',
+        options: variant === 0 ? [{ text: 'an' }, { text: 'a' }, { text: 'the' }, { text: 'no article' }] : [{ text: 'an' }, { text: 'a' }, { text: 'the' }, { text: 'no article' }],
+        correctIndex: 0,
+        explanation: 'Use the correct article before the word.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Prepositions':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'She is interested ____ music.' : 'He arrived ____ the station on time.',
+        options: variant === 0 ? [{ text: 'in' }, { text: 'on' }, { text: 'at' }, { text: 'for' }] : [{ text: 'at' }, { text: 'in' }, { text: 'on' }, { text: 'by' }],
+        correctIndex: 0,
+        explanation: 'Pick the appropriate preposition.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Conjunctions':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'I was tired, ____ I kept studying.' : 'He is smart ____ hardworking.',
+        options: variant === 0 ? [{ text: 'but' }, { text: 'because' }, { text: 'so' }, { text: 'although' }] : [{ text: 'and' }, { text: 'but' }, { text: 'or' }, { text: 'yet' }],
+        correctIndex: 0,
+        explanation: 'Select the conjunction that best joins the clause.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Paragraph Rearrangement':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Arrange: A. He woke up. B. He brushed his teeth. C. He went to school.' : 'Arrange: A. She cooked dinner. B. She bought vegetables. C. She washed hands.',
+        options: variant === 0 ? [{ text: 'A-B-C' }, { text: 'B-A-C' }, { text: 'C-B-A' }, { text: 'A-C-B' }] : [{ text: 'B-C-A' }, { text: 'A-B-C' }, { text: 'C-A-B' }, { text: 'B-A-C' }],
+        correctIndex: 0,
+        explanation: 'Choose the logical sequence of events.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Spelling':
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: variant === 0 ? 'Choose the correctly spelled word.' : 'Choose the correctly spelled word.',
+        options: variant === 0 ? [{ text: 'necessary' }, { text: 'neccessary' }, { text: 'necessery' }, { text: 'necesary' }] : [{ text: 'accommodate' }, { text: 'acommodate' }, { text: 'accomodate' }, { text: 'acomodate' }],
+        correctIndex: 0,
+        explanation: 'Pick the correctly spelled word.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    default:
+      return {
+        module: 'verbal',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Solve the verbal question for ${topic.topic}.`,
+        options: [{ text: 'Option A' }, { text: 'Option B' }, { text: 'Option C' }, { text: 'Option D' }],
+        correctIndex: 0,
+        explanation: 'Use the verbal rule shown in the prompt.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+  }
+}
+
+function generateVerbalQuestionsForTopic(topicIndex, count = 80) {
+  return Array.from({ length: count }, (_, questionIndex) => buildVerbalQuestion(topicIndex % topics.verbal.length, questionIndex))
+}
+
+function generateVerbalTopicBank(perTopicCount = 80) {
+  return topics.verbal.flatMap((_, topicIndex) => generateVerbalQuestionsForTopic(topicIndex, perTopicCount))
+}
+
 const vocab = ['happy', 'quick', 'bright', 'calm', 'ancient', 'brave', 'eager', 'fierce']
 const synonyms = { happy: 'joyful', quick: 'fast', bright: 'smart', calm: 'serene', ancient: 'old', brave: 'courageous', eager: 'enthusiastic', fierce: 'ferocious' }
 
@@ -793,6 +1087,8 @@ module.exports = {
   generateAptitudeTopicBank,
   generateReasoningQuestionsForTopic,
   generateReasoningTopicBank,
+  generateVerbalQuestionsForTopic,
+  generateVerbalTopicBank,
   getAptitudeTopics,
   getReasoningTopics,
 }

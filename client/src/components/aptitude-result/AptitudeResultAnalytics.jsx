@@ -282,7 +282,7 @@ function BadgePill({ children }) {
 export function AptitudeResultAnalytics({ attempt, analytics, history = [], gamification = null, onBack, module }) {
   const [showAnswers, setShowAnswers] = useState(false)
   const assessmentModule = (module || attempt?.module || 'aptitude').toLowerCase()
-  const moduleLabel = assessmentModule === 'reasoning' ? 'Reasoning' : 'Aptitude'
+  const moduleLabel = assessmentModule === 'reasoning' ? 'Reasoning' : assessmentModule === 'verbal' ? 'Verbal' : 'Aptitude'
 
   const model = useMemo(() => buildAptitudeAnalytics({ attempt, analytics, history, gamification }), [attempt, analytics, history, gamification])
 
@@ -397,7 +397,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
           </motion.section>
 
           <section className="grid gap-5 xl:grid-cols-2">
-            <ChartShell title="Radar Strength Map" subtitle="Topic strengths for this aptitude attempt." icon={RadarIcon}>
+            <ChartShell title="Radar Strength Map" subtitle={`Topic strengths for this ${moduleLabel.toLowerCase()} attempt.`} icon={RadarIcon}>
               <div className="h-80">
                 {model.radarData.length ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -459,7 +459,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
               </div>
             </ChartShell>
 
-            <ChartShell title="Improvement Trend" subtitle="Recent aptitude attempts and performance drift." icon={TrendingUp}>
+            <ChartShell title="Improvement Trend" subtitle={`Recent ${moduleLabel.toLowerCase()} attempts and performance drift.`} icon={TrendingUp}>
               <div className="h-80">
                 {model.trendData.length ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -476,7 +476,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center rounded-[1rem] border border-dashed border-white/10 bg-white/5 text-sm text-white/45">Complete more aptitude attempts to reveal trend lines.</div>
+                  <div className="flex h-full items-center justify-center rounded-[1rem] border border-dashed border-white/10 bg-white/5 text-sm text-white/45">Complete more {moduleLabel.toLowerCase()} attempts to reveal trend lines.</div>
                 )}
               </div>
             </ChartShell>
