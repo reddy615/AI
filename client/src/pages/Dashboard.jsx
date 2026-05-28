@@ -78,7 +78,23 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboard()
     const intervalId = setInterval(loadDashboard, 30000)
-    return () => clearInterval(intervalId)
+    const handleRefresh = () => {
+      loadDashboard()
+    }
+    const handleStorageRefresh = (event) => {
+      if (event.key === 'ai-dashboard-refresh' && event.newValue) {
+        loadDashboard()
+      }
+    }
+
+    window.addEventListener('ai-dashboard-refresh', handleRefresh)
+    window.addEventListener('storage', handleStorageRefresh)
+
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener('ai-dashboard-refresh', handleRefresh)
+      window.removeEventListener('storage', handleStorageRefresh)
+    }
   }, [])
 
   const logout = async () => {

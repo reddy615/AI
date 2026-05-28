@@ -45,6 +45,14 @@ export default function Quiz(){
     const payload = { module, difficulty, answers: normalizedAnswers, durationSeconds: duration }
     try{
       const res = await api.post('/api/quiz/submit', payload)
+      const refreshToken = JSON.stringify({
+        type: 'quiz-submitted',
+        module,
+        attemptId: res.data?.attemptId,
+        timestamp: Date.now(),
+      })
+      window.localStorage.setItem('ai-dashboard-refresh', refreshToken)
+      window.dispatchEvent(new CustomEvent('ai-dashboard-refresh', { detail: JSON.parse(refreshToken) }))
       navigate(`/result/${res.data.attemptId}`)
     }catch(err){ console.error(err); alert('Submit failed') }
   }
