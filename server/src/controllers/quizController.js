@@ -82,9 +82,12 @@ function scoreQuizAnswers(questionsById, answers) {
       skipped += 1;
       answerRecords.push({
         questionId: question._id,
+        questionText: question.text,
         topic: question.topic,
         selectedIndex: null,
+        selectedAnswer: null,
         correctIndex: question.correctIndex,
+        correctAnswer: question.options?.[question.correctIndex]?.text || null,
         marks: question.marks,
         negativeMarks: question.negativeMarks,
       });
@@ -104,9 +107,12 @@ function scoreQuizAnswers(questionsById, answers) {
 
     answerRecords.push({
       questionId: question._id,
+      questionText: question.text,
       topic: question.topic,
       selectedIndex,
+      selectedAnswer: question.options?.[selectedIndex]?.text || null,
       correctIndex: question.correctIndex,
+      correctAnswer: question.options?.[question.correctIndex]?.text || null,
       marks: question.marks,
       negativeMarks: question.negativeMarks,
     });
@@ -223,7 +229,7 @@ exports.submitAnswers = asyncHandler(async (req, res) => {
 
   if (dbQuestionIds.length && mongoose.connection.readyState === 1) {
     try {
-      const questions = await Question.find({ _id: { $in: dbQuestionIds.map((id) => new mongoose.Types.ObjectId(id)) } }).select('correctIndex marks negativeMarks topic');
+      const questions = await Question.find({ _id: { $in: dbQuestionIds.map((id) => new mongoose.Types.ObjectId(id)) } }).select('text options correctIndex marks negativeMarks topic');
       questions.forEach((question) => questionsById.set(String(question._id), question));
     } catch (error) {
       console.warn('Quiz database unavailable during submit, using local cache', error.message);
