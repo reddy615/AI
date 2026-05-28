@@ -23,6 +23,9 @@ const recommendationRoutes = require('./routes/recommendations');
 const gamificationRoutes = require('./routes/gamification');
 const adminRoutes = require('./routes/admin');
 
+const uploadsDir = path.join(__dirname, '../uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
 client.collectDefaultMetrics({ prefix: 'ai_interview_' });
 const httpRequestDuration = new client.Histogram({
 	name: 'http_request_duration_seconds',

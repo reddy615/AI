@@ -15,6 +15,10 @@ export default function Dashboard() {
   const [recommendations, setRecommendations] = useState([])
   const [gamification, setGamification] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [resumeFile, setResumeFile] = useState(null)
+  const [resumeUploading, setResumeUploading] = useState(false)
+  const [resumeMessage, setResumeMessage] = useState('')
+  const [resumeError, setResumeError] = useState('')
   const navigate = useNavigate()
 
   const loadDashboard = async () => {
@@ -85,6 +89,37 @@ export default function Dashboard() {
     } finally {
       localStorage.removeItem('token')
       window.location.href = '/'
+    }
+  }
+
+  const uploadResume = async (event) => {
+    event.preventDefault()
+    setResumeError('')
+    setResumeMessage('')
+
+    if (!resumeFile) {
+      setResumeError('Choose a PDF or Word document first.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('resume', resumeFile)
+
+    setResumeUploading(true)
+    try {
+      const response = await api.post('/api/profile/resume', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      const uploadedResume = response.data?.data?.resume || response.data?.resume
+      setUser((current) => ({ ...(current || {}), resume: uploadedResume }))
+      setResumeMessage('Resume uploaded successfully.')
+      setResumeFile(null)
+      event.target.reset()
+    } catch (error) {
+      setResumeError(error.response?.data?.message || 'Resume upload failed.')
+    } finally {
+      setResumeUploading(false)
     }
   }
 
@@ -175,11 +210,39 @@ export default function Dashboard() {
                 <Skeleton className="h-5 w-40" />
               </div>
             ) : (
-              <div className="mt-4 space-y-2 text-sm text-slate-600">
-                <p><span className="font-semibold text-slate-900">Name:</span> {user?.name}</p>
-                <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
-                <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
-                <p><span className="font-semibold text-slate-900">Resume:</span> {user?.resume ? 'Uploaded' : 'Not uploaded'}</p>
+              <div className="mt-4 space-y-4 text-sm text-slate-600">
+                <div className="space-y-2">
+                  <p><span className="font-semibold text-slate-900">Name:</span> {user?.name}</p>
+                  <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
+                  <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
+                  <p><span className="font-semibold text-slate-900">Resume:</span> {user?.resume ? 'Uploaded' : 'Not uploaded'}</p>
+                </div>
+
+                <form onSubmit={uploadResume} className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Upload Resume</label>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
+                      className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={resumeUploading}
+                      className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resumeUploading ? 'Uploading...' : 'Upload Resume'}
+                    </button>
+                    {resumeFile ? <span className="text-xs text-slate-500">Selected: {resumeFile.name}</span> : null}
+                  </div>
+
+                  {resumeMessage ? <p className="text-sm font-medium text-emerald-600">{resumeMessage}</p> : null}
+                  {resumeError ? <p className="text-sm font-medium text-red-600">{resumeError}</p> : null}
+                </form>
               </div>
             )}
           </div>
