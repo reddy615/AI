@@ -21,4 +21,4 @@ COPY --from=builder /app/client/dist /app/client/dist
 ENV NODE_ENV=production
 EXPOSE 5000
 WORKDIR /app/server
-CMD ["node", "server.js"]
+CMD ["sh", "./start-root.sh"]

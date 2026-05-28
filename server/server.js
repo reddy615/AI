@@ -6,14 +6,14 @@ const { Server } = require('socket.io');
 
 dotenv.config();
 const defaultMongoUri = 'mongodb://127.0.0.1:27017/ai-interview';
-const hasMongoUri = Boolean(
-  process.env.MONGO_URI
-  && process.env.MONGO_URI.trim()
-  && process.env.MONGO_URI !== defaultMongoUri
-  && !process.env.MONGO_URI.includes('localhost:27017')
-);
-const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim());
 const env = loadEnv();
+const mongoUri = String(env.MONGO_URI || '').trim();
+const isLocalMongoUri = !mongoUri
+  || mongoUri === defaultMongoUri
+  || mongoUri.includes('localhost:27017')
+  || mongoUri.includes('127.0.0.1:27017');
+const hasMongoUri = Boolean(mongoUri && !isLocalMongoUri);
+const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim());
 
 if (env.NODE_ENV === 'production') {
   const isDevSecret = (secret) => !secret || secret.startsWith('dev_');
@@ -33,6 +33,11 @@ if (env.NODE_ENV === 'production') {
 
   if (missingDedicatedSecrets) {
     console.warn('ACCESS_TOKEN_SECRET and/or REFRESH_TOKEN_SECRET are not set to dedicated production values. Falling back to JWT_SECRET.');
+  }
+
+  if (isLocalMongoUri) {
+    console.error('Production MONGO_URI is missing or points to a local MongoDB host. Set MONGO_URI to your MongoDB Atlas connection string.');
+    process.exit(1);
   }
 }
 
