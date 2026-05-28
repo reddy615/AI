@@ -66,11 +66,13 @@ exports.register = asyncHandler(async (req, res) => {
 
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  console.log('[auth:login] request received', { email });
 
   const localUser = findLocalUserByEmail(email);
   if (localUser && localUser.password === password) {
     const tokens = issueTokens(localUser);
     setRefreshCookie(res, tokens.refreshToken);
+    console.log('[auth:login] local user authenticated', { email, userId: localUser.id });
     return attachAuthPayload(res, localUser, tokens, 'Login successful');
   }
 
@@ -81,6 +83,7 @@ exports.login = asyncHandler(async (req, res) => {
       if (!match) return sendError(res, 'Invalid credentials', 400);
       const tokens = issueTokens(user);
       setRefreshCookie(res, tokens.refreshToken);
+      console.log('[auth:login] database user authenticated', { email, userId: String(user._id) });
       return attachAuthPayload(res, user, tokens, 'Login successful');
     }
   } catch (error) {
@@ -93,6 +96,7 @@ exports.login = asyncHandler(async (req, res) => {
 
   const tokens = issueTokens(localUser);
   setRefreshCookie(res, tokens.refreshToken);
+  console.log('[auth:login] local fallback authenticated', { email, userId: localUser.id });
   return attachAuthPayload(res, localUser, tokens, 'Login successful');
 });
 

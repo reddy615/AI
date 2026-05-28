@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
 
+const DEFAULT_DEV_JWT_SECRET = 'ai-interview-dev-secret';
+
 function resolveSecret(preferredSecret) {
   if (preferredSecret && !preferredSecret.startsWith('dev_')) {
     return preferredSecret;
   }
 
-  return process.env.JWT_SECRET;
+  return process.env.JWT_SECRET || DEFAULT_DEV_JWT_SECRET;
 }
 
 function signAccessToken(payload) {

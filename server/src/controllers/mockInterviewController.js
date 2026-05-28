@@ -11,9 +11,22 @@ const {
 const { transcribeAudio, estimateSpeechMetrics } = require('../services/speechService');
 const { analyzeCameraFrame, summarizeCameraMetrics } = require('../services/cameraService');
 const { recordActivity } = require('../services/gamificationService');
+const {
+  findInterviewSessionById,
+  listInterviewSessionsByUser,
+  serializeInterviewSession,
+} = require('../services/interviewSessionStore');
 
 exports.startSession = asyncHandler(async (req, res) => {
   const { interviewType = 'technical', role = 'Software Engineer', experienceLevel = 'mid', weakAreas = [] } = req.body;
+  console.log('[mock-interview:start] request', {
+    userId: req.user.id,
+    interviewType,
+    role,
+    experienceLevel,
+    weakAreas,
+  });
+
   const session = await createSession({
     userId: req.user.id,
     interviewType,
@@ -22,18 +35,24 @@ exports.startSession = asyncHandler(async (req, res) => {
     weakAreas,
   });
 
-  return res.apiSuccess({ session }, 'Mock interview session created', 201);
+  console.log('[mock-interview:start] created session', {
+    sessionId: session?._id,
+    status: session?.status,
+    questionCount: session?.questions?.length || 0,
+  });
+
+  return res.apiSuccess({ session: serializeInterviewSession(session) }, 'Mock interview session created', 201);
 });
 
 exports.getSession = asyncHandler(async (req, res) => {
-  const session = await MockInterviewSession.findById(req.params.id).lean();
+  const session = await findInterviewSessionById(req.params.id);
   if (!session) return sendError(res, 'Session not found', 404);
   if (String(session.user) !== String(req.user.id)) return sendError(res, 'Forbidden', 403);
-  return res.apiSuccess({ session }, 'Session loaded');
+  return res.apiSuccess({ session: serializeInterviewSession(session) }, 'Session loaded');
 });
 
 exports.endSession = asyncHandler(async (req, res) => {
-  const session = await MockInterviewSession.findById(req.params.id);
+  const session = await findInterviewSessionById(req.params.id);
   if (!session) return sendError(res, 'Session not found', 404);
   if (String(session.user) !== String(req.user.id)) return sendError(res, 'Forbidden', 403);
 
@@ -68,12 +87,12 @@ exports.endSession = asyncHandler(async (req, res) => {
   });
 
   await session.save();
-  return res.apiSuccess({ session, gamification }, 'Session completed');
+  return res.apiSuccess({ session: serializeInterviewSession(session), gamification }, 'Session completed');
 });
 
 exports.transcribeAudio = asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
-  const session = await MockInterviewSession.findById(sessionId);
+  const session = await findInterviewSessionById(sessionId);
   if (!session) return sendError(res, 'Session not found', 404);
   if (String(session.user) !== String(req.user.id)) return sendError(res, 'Forbidden', 403);
 
@@ -109,7 +128,7 @@ exports.transcribeAudio = asyncHandler(async (req, res) => {
 exports.processTranscript = asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
   const { transcript = '', questionId, cameraMetrics = [] } = req.body;
-  let session = await MockInterviewSession.findById(sessionId);
+  let session = await findInterviewSessionById(sessionId);
   if (!session) return sendError(res, 'Session not found', 404);
   if (String(session.user) !== String(req.user.id)) return sendError(res, 'Forbidden', 403);
 
@@ -139,7 +158,7 @@ exports.processTranscript = asyncHandler(async (req, res) => {
 
 exports.recordCameraMetrics = asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
-  const session = await MockInterviewSession.findById(sessionId);
+  const session = await findInterviewSessionById(sessionId);
   if (!session) return sendError(res, 'Session not found', 404);
   if (String(session.user) !== String(req.user.id)) return sendError(res, 'Forbidden', 403);
 
@@ -167,6 +186,6 @@ exports.recordCameraMetrics = asyncHandler(async (req, res) => {
 });
 
 exports.listSessions = asyncHandler(async (req, res) => {
-  const sessions = await MockInterviewSession.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(20).lean();
+  const sessions = await listInterviewSessionsByUser(req.user.id);
   return res.apiSuccess({ sessions }, 'Sessions loaded');
 });

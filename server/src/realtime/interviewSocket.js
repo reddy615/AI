@@ -1,7 +1,7 @@
 const { verifyAccessToken } = require('../utils/jwt');
-const MockInterviewSession = require('../models/MockInterviewSession');
 const { evaluateTranscript, buildFollowUpQuestions, appendSessionFeedback, calculateSessionAverages } = require('../services/mockInterviewService');
 const { analyzeCameraFrame, summarizeCameraMetrics } = require('../services/cameraService');
+const { findInterviewSessionById, serializeInterviewSession } = require('../services/interviewSessionStore');
 
 function registerInterviewSocket(io) {
   io.use(async (socket, next) => {
@@ -17,14 +17,30 @@ function registerInterviewSocket(io) {
   });
 
   io.on('connection', async (socket) => {
+    console.log('[mock-interview:socket] connection established', {
+      socketId: socket.id,
+      userId: socket.user?.id,
+    });
+
     socket.on('interview:join', async ({ sessionId }) => {
-      const session = await MockInterviewSession.findById(sessionId);
+      console.log('[mock-interview:socket] join request', {
+        socketId: socket.id,
+        userId: socket.user?.id,
+        sessionId,
+      });
+
+      const session = await findInterviewSessionById(sessionId);
       if (!session || String(session.user) !== String(socket.user.id)) {
         socket.emit('interview:error', { message: 'Session not found or forbidden' });
         return;
       }
 
       socket.join(sessionId);
+      console.log('[mock-interview:socket] joined room', {
+        socketId: socket.id,
+        sessionId,
+      });
+
       if (session.status === 'created') {
         session.status = 'live';
         await session.save();
@@ -32,7 +48,7 @@ function registerInterviewSocket(io) {
 
       socket.emit('interview:session', {
         sessionId,
-        session: session.toObject(),
+        session: serializeInterviewSession(session),
         currentQuestion: session.questions[session.currentQuestionIndex] || null,
         scores: session.scores,
         metrics: session.metrics,
@@ -40,7 +56,7 @@ function registerInterviewSocket(io) {
     });
 
     socket.on('interview:transcript', async ({ sessionId, transcript, questionId, cameraMetrics = [] }) => {
-      const session = await MockInterviewSession.findById(sessionId);
+      const session = await findInterviewSessionById(sessionId);
       if (!session || String(session.user) !== String(socket.user.id)) return;
 
       const question = session.questions.find((item) => String(item.id) === String(questionId)) || session.questions[session.currentQuestionIndex] || session.questions[0];
@@ -75,7 +91,7 @@ function registerInterviewSocket(io) {
     });
 
     socket.on('interview:camera-metrics', async ({ sessionId, metrics }) => {
-      const session = await MockInterviewSession.findById(sessionId);
+      const session = await findInterviewSessionById(sessionId);
       if (!session || String(session.user) !== String(socket.user.id)) return;
 
       const analyzed = analyzeCameraFrame(metrics || {});
@@ -104,7 +120,7 @@ function registerInterviewSocket(io) {
     });
 
     socket.on('interview:audio-metrics', async ({ sessionId, metrics }) => {
-      const session = await MockInterviewSession.findById(sessionId);
+      const session = await findInterviewSessionById(sessionId);
       if (!session || String(session.user) !== String(socket.user.id)) return;
       const nextMetrics = Array.isArray(metrics) ? metrics : [metrics].filter(Boolean);
       session.audioMetrics.push(...nextMetrics.map((item) => ({
@@ -126,7 +142,7 @@ function registerInterviewSocket(io) {
     });
 
     socket.on('interview:end', async ({ sessionId }) => {
-      const session = await MockInterviewSession.findById(sessionId);
+      const session = await findInterviewSessionById(sessionId);
       if (!session || String(session.user) !== String(socket.user.id)) return;
       session.status = 'completed';
       session.endedAt = new Date();
@@ -134,7 +150,7 @@ function registerInterviewSocket(io) {
       session.scores.overallScore = Math.round((session.scores.communicationScore + session.scores.confidenceScore + session.scores.technicalAccuracyScore + session.scores.behavioralScore + session.scores.eyeContactScore) / 5);
       await session.save();
 
-      io.to(sessionId).emit('interview:ended', { session: session.toObject() });
+      io.to(sessionId).emit('interview:ended', { session: serializeInterviewSession(session) });
       socket.leave(sessionId);
     });
 

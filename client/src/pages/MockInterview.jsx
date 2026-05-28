@@ -56,6 +56,7 @@ export default function MockInterview() {
 
   const videoRef = useRef(null)
   const cameraStreamRef = useRef(null)
+  const audioStreamRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const recordedChunksRef = useRef([])
   const socketRef = useRef(null)
@@ -183,13 +184,36 @@ export default function MockInterview() {
   }, [])
 
   const initCamera = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    cameraStreamRef.current = stream
+    console.log('[mock-interview:camera] requesting getUserMedia', {
+      secureContext: window.isSecureContext,
+      hasMediaDevices: Boolean(navigator.mediaDevices),
+      cameraPermission: navigator.permissions ? 'queryable' : 'not-supported',
+    })
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('navigator.mediaDevices.getUserMedia is not available')
+    }
+
+    const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    cameraStreamRef.current = videoStream
     if (videoRef.current) {
-      videoRef.current.srcObject = stream
+      videoRef.current.srcObject = videoStream
       await videoRef.current.play()
     }
-    return stream
+
+    try {
+      audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    } catch (audioError) {
+      audioStreamRef.current = null
+      console.warn('[mock-interview:camera] microphone unavailable', audioError)
+    }
+
+    console.log('[mock-interview:camera] camera stream started', {
+      videoTracks: videoStream.getVideoTracks().map((track) => track.label),
+      audioTracks: audioStreamRef.current?.getAudioTracks().map((track) => track.label) || [],
+    })
+
+    return { videoStream, audioStream: audioStreamRef.current }
   }, [])
 
   const stopCamera = useCallback(() => {
@@ -200,6 +224,10 @@ export default function MockInterview() {
     if (cameraStreamRef.current) {
       cameraStreamRef.current.getTracks().forEach((track) => track.stop())
       cameraStreamRef.current = null
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => track.stop())
+      audioStreamRef.current = null
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null
@@ -263,14 +291,23 @@ export default function MockInterview() {
       await initCamera()
     }
 
-    const audioTrack = cameraStreamRef.current?.getAudioTracks?.()[0]
+    if (!audioStreamRef.current) {
+      try {
+        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      } catch (audioError) {
+        console.warn('[mock-interview:camera] microphone unavailable for recording', audioError)
+      }
+    }
+
+    const audioTrack = audioStreamRef.current?.getAudioTracks?.()[0]
     if (!audioTrack) {
       setAudioStatus('Microphone unavailable')
       return
     }
 
     recordedChunksRef.current = []
-    const recorder = new MediaRecorder(cameraStreamRef.current, { mimeType: 'audio/webm' })
+    const recordingStream = new MediaStream([audioTrack])
+    const recorder = new MediaRecorder(recordingStream, { mimeType: 'audio/webm' })
     recorder.ondataavailable = (event) => {
       if (event.data?.size) recordedChunksRef.current.push(event.data)
     }
@@ -370,6 +407,13 @@ export default function MockInterview() {
   const startInterview = async (event) => {
     event.preventDefault()
     setLoadingSession(true)
+    console.log('[mock-interview:start] submit clicked', {
+      interviewType: form.interviewType,
+      role: form.role,
+      experienceLevel: form.experienceLevel,
+      weakAreas: form.weakAreas,
+    })
+
     try {
       const weakAreas = form.weakAreas.split(',').map((item) => item.trim()).filter(Boolean)
       const response = await api.post('/api/mock-interviews/start', {
@@ -379,8 +423,19 @@ export default function MockInterview() {
         weakAreas,
       })
 
+      console.log('[mock-interview:start] API response', {
+        status: response.status,
+        data: response.data,
+      })
+
       const payload = response.data.data || response.data
       const nextSession = payload.session
+      console.log('[mock-interview:start] parsed session', {
+        sessionId: nextSession?._id,
+        status: nextSession?.status,
+        questionCount: nextSession?.questions?.length || 0,
+      })
+
       setSession(nextSession)
       setCurrentQuestion(nextSession?.questions?.[0] || null)
       setScores(nextSession?.scores || scores)
@@ -407,7 +462,7 @@ export default function MockInterview() {
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
       elapsedIntervalRef.current = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - interviewStartedAtRef.current) / 1000)), 1000)
     } catch (error) {
-      console.error(error)
+      console.error('[mock-interview:start] failed', error)
       setAssistantNote('Failed to start the interview session.')
     } finally {
       setLoadingSession(false)
@@ -437,6 +492,21 @@ export default function MockInterview() {
       speakQuestion(currentQuestion.question)
     }
   }, [currentQuestion?.question])
+
+  useEffect(() => {
+    console.log('[mock-interview:state] session changed', {
+      hasSession: Boolean(session),
+      sessionId: session?._id,
+      status: session?.status,
+      questionCount: session?.questions?.length || 0,
+      currentQuestion: currentQuestion?.question || null,
+      loadingSession,
+      loadingModels,
+      modelStatus,
+      cameraStatus: modelStatus,
+      isRecording,
+    })
+  }, [currentQuestion?.question, isRecording, loadingModels, loadingSession, modelStatus, session])
 
   useEffect(() => {
     return () => {

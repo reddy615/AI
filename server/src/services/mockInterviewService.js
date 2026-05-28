@@ -1,4 +1,5 @@
 const MockInterviewSession = require('../models/MockInterviewSession');
+const { createInterviewSession } = require('./interviewSessionStore');
 
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
@@ -175,7 +176,7 @@ async function createSession({ userId, interviewType, role, experienceLevel, wea
     order: index,
   }));
 
-  return MockInterviewSession.create({
+  return createInterviewSession({
     user: userId,
     interviewType,
     role,
