@@ -346,7 +346,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
                   <MetricChip label="Correct" value={model.correct} icon={CheckCircle2} tone="from-emerald-500/18 to-emerald-400/8" />
                   <MetricChip label="Wrong" value={model.wrong} icon={Target} tone="from-rose-500/18 to-rose-400/8" />
                   <MetricChip label="Skipped" value={model.skipped} icon={Clock3} tone="from-slate-500/18 to-slate-400/8" />
-                  <MetricChip label="Time" value={model.duration} icon={Clock3} tone="from-cyan-500/18 to-blue-400/8" />
+                  <MetricChip label="Time Taken" value={model.duration} icon={Clock3} tone="from-cyan-500/18 to-blue-400/8" />
                 </div>
               </div>
 

@@ -18,7 +18,8 @@ export default function Quiz(){
   const [answers, setAnswers] = useState({})
   const [index, setIndex] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [duration, setDuration] = useState(60 * 15) // default 15 min
+  const [duration, setDuration] = useState(60 * 15) // remaining seconds
+  const totalDuration = 60 * 15
 
   const timerRef = useRef()
 
@@ -39,10 +40,11 @@ export default function Quiz(){
   }
 
   const submit = async (auto=false)=>{
+    const elapsedSeconds = Math.max(totalDuration - duration, 0)
     const normalizedAnswers = Object.fromEntries(
       questions.map((question) => [question.id, Object.prototype.hasOwnProperty.call(answers, question.id) ? answers[question.id] : null])
     )
-    const payload = { module, difficulty, answers: normalizedAnswers, durationSeconds: duration }
+    const payload = { module, difficulty, answers: normalizedAnswers, durationSeconds: elapsedSeconds, remainingSeconds: duration, totalDurationSeconds: totalDuration }
     try{
       const res = await api.post('/api/quiz/submit', payload)
       const refreshToken = JSON.stringify({
