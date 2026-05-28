@@ -11,6 +11,7 @@ import {
   Clock3,
   Flame,
   Lightbulb,
+  TrendingUp,
   Radar as RadarIcon,
   Sparkles,
   Target,
