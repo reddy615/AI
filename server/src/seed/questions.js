@@ -421,6 +421,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
   const topic = topics.reasoning[topicIndex % topics.reasoning.length]
   const difficulty = questionIndex % 3 === 0 ? 'easy' : (questionIndex % 3 === 1 ? 'medium' : 'hard')
   const seed = (topicIndex + 1) * 13 + questionIndex + 9
+  const variant = questionIndex % 2
 
   switch (topic.topic) {
     case 'Syllogism':
@@ -429,23 +430,29 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'All pens are books. All books are pages. Which statement is definitely true?',
-        options: [{ text: 'All pens are pages' }, { text: 'Some pages are pens' }, { text: 'No pens are pages' }, { text: 'All pages are pens' }],
+        text: variant === 0
+          ? 'All pens are books. All books are pages. Which statement is definitely true?'
+          : 'Some cats are pets. All pets are animals. Which conclusion is definitely true?',
+        options: variant === 0
+          ? [{ text: 'All pens are pages' }, { text: 'Some pages are pens' }, { text: 'No pens are pages' }, { text: 'All pages are pens' }]
+          : [{ text: 'Some cats are animals' }, { text: 'All animals are cats' }, { text: 'No cats are animals' }, { text: 'Some animals are cats' }],
         correctIndex: 0,
-        explanation: 'Pens go into books and books go into pages, so pens go into pages.',
+        explanation: variant === 0 ? 'Pens go into books and books go into pages, so pens go into pages.' : 'Cats are pets and pets are animals, so some cats are animals.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
     case 'Series': {
       const start = (seed % 8) + 2
       const step = (questionIndex % 4) + 2
-      const next = start + 4 * step
+      const next = variant === 0 ? start + 4 * step : start + 3 * step
       return {
         module: 'reasoning',
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: `Find the next number in the series: ${start}, ${start + step}, ${start + 2 * step}, ${start + 3 * step}, ___.`,
+        text: variant === 0
+          ? `Find the next number in the series: ${start}, ${start + step}, ${start + 2 * step}, ${start + 3 * step}, ___.`
+          : `Find the next number in the series: ${start}, ${start + step}, ${start + 2 * step}, ___.`,
         options: [{ text: String(next) }, { text: String(next + step) }, { text: String(next - step) }, { text: String(next + 2 * step) }],
         correctIndex: 0,
         explanation: 'The series increases by a constant difference.',
@@ -459,10 +466,14 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Choose the figure that completes the matrix pattern by rotating each symbol 90 degrees clockwise.',
-        options: [{ text: 'Option A' }, { text: 'Option B' }, { text: 'Option C' }, { text: 'Option D' }],
+        text: variant === 0
+          ? 'Choose the figure that completes the matrix pattern by rotating each symbol 90 degrees clockwise.'
+          : 'Choose the figure that completes the matrix pattern by shifting the shaded cell diagonally.',
+        options: variant === 0
+          ? [{ text: 'Option A' }, { text: 'Option B' }, { text: 'Option C' }, { text: 'Option D' }]
+          : [{ text: 'Option B' }, { text: 'Option A' }, { text: 'Option D' }, { text: 'Option C' }],
         correctIndex: 0,
-        explanation: 'The pattern follows a clockwise rotation sequence.',
+        explanation: variant === 0 ? 'The pattern follows a clockwise rotation sequence.' : 'The pattern follows a diagonal shift sequence.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -473,10 +484,12 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Five people are seated in a row. A sits left of B and right of C. D is at one end. Who sits in the middle?',
-        options: [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }],
+        text: variant === 0
+          ? 'Five people are seated in a row. A sits left of B and right of C. D is at one end. Who sits in the middle?'
+          : 'Five people are seated in a row. E sits between B and C. A is at one end. Who sits in the middle?',
+        options: variant === 0 ? [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }] : [{ text: 'E' }, { text: 'A' }, { text: 'B' }, { text: 'C' }],
         correctIndex: 0,
-        explanation: 'The middle position is occupied by A in the described order.',
+        explanation: variant === 0 ? 'The middle position is occupied by A in the described order.' : 'The middle position is occupied by E in the described order.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -486,10 +499,12 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'A person walks 5 km north, 3 km east, then 5 km south. How far from the starting point are they?',
-        options: [{ text: '3 km' }, { text: '5 km' }, { text: '8 km' }, { text: '10 km' }],
+        text: variant === 0
+          ? 'A person walks 5 km north, 3 km east, then 5 km south. How far from the starting point are they?'
+          : 'A person walks 4 km west, 6 km north, then 4 km east. How far from the starting point are they?',
+        options: variant === 0 ? [{ text: '3 km' }, { text: '5 km' }, { text: '8 km' }, { text: '10 km' }] : [{ text: '6 km' }, { text: '4 km' }, { text: '10 km' }, { text: '0 km' }],
         correctIndex: 0,
-        explanation: 'North and south cancel out, leaving 3 km east.',
+        explanation: variant === 0 ? 'North and south cancel out, leaving 3 km east.' : 'West and east cancel out, leaving 6 km north.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -499,8 +514,8 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'If CAT is coded as DBU, how is DOG coded?',
-        options: [{ text: 'EPH' }, { text: 'DPI' }, { text: 'EOG' }, { text: 'CPF' }],
+        text: variant === 0 ? 'If CAT is coded as DBU, how is DOG coded?' : 'If BAD is coded as CBE, how is FUN coded?',
+        options: variant === 0 ? [{ text: 'EPH' }, { text: 'DPI' }, { text: 'EOG' }, { text: 'CPF' }] : [{ text: 'GVO' }, { text: 'EVM' }, { text: 'FTO' }, { text: 'HWP' }],
         correctIndex: 0,
         explanation: 'Each letter is shifted one step forward.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
@@ -512,10 +527,12 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Pointing to a man, Riya says, "He is the son of my mother’s only daughter." Who is the man to Riya?',
-        options: [{ text: 'Brother' }, { text: 'Father' }, { text: 'Uncle' }, { text: 'Cousin' }],
+        text: variant === 0
+          ? 'Pointing to a man, Riya says, "He is the son of my mother’s only daughter." Who is the man to Riya?'
+          : 'Pointing to a woman, Aman says, "She is the daughter of my father’s only son." Who is the woman to Aman?',
+        options: variant === 0 ? [{ text: 'Brother' }, { text: 'Father' }, { text: 'Uncle' }, { text: 'Cousin' }] : [{ text: 'Sister' }, { text: 'Mother' }, { text: 'Aunt' }, { text: 'Cousin' }],
         correctIndex: 0,
-        explanation: 'Mother’s only daughter is Riya herself, so the man is her son. In this simplified set, the intended relation is brother-like sibling logic.',
+        explanation: variant === 0 ? 'Mother’s only daughter is Riya herself, so the man is her son. In this simplified set, the intended relation is brother-like sibling logic.' : 'Father’s only son is Aman himself, so the woman is his sister.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -525,8 +542,10 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'In a class of 20 students, Arjun is 7th from the top. What is his rank from the bottom?',
-        options: [{ text: '14th' }, { text: '13th' }, { text: '12th' }, { text: '11th' }],
+        text: variant === 0
+          ? 'In a class of 20 students, Arjun is 7th from the top. What is his rank from the bottom?'
+          : 'In a class of 30 students, Priya is 9th from the top. What is her rank from the bottom?',
+        options: variant === 0 ? [{ text: '14th' }, { text: '13th' }, { text: '12th' }, { text: '11th' }] : [{ text: '22nd' }, { text: '21st' }, { text: '20th' }, { text: '19th' }],
         correctIndex: 0,
         explanation: 'Bottom rank = total + 1 - top rank.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
@@ -538,7 +557,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Statement: All apples are fruits. Conclusion: All fruits are apples.',
+        text: variant === 0 ? 'Statement: All apples are fruits. Conclusion: All fruits are apples.' : 'Statement: Some birds can fly. Conclusion: All flying things are birds.',
         options: [{ text: 'Only the statement is true' }, { text: 'Only the conclusion is true' }, { text: 'Both are true' }, { text: 'Neither is true' }],
         correctIndex: 0,
         explanation: 'The statement does not imply the reverse.',
@@ -551,7 +570,9 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Assertion: Water is essential for life. Reason: Living organisms need water for cellular processes.',
+        text: variant === 0
+          ? 'Assertion: Water is essential for life. Reason: Living organisms need water for cellular processes.'
+          : 'Assertion: Practice improves skill. Reason: Repeated exposure strengthens understanding and speed.',
         options: [
           { text: 'Both are true and Reason explains Assertion' },
           { text: 'Both are true but Reason does not explain Assertion' },
@@ -569,7 +590,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'If the machine transforms 3 5 7 into 5 7 9, what does it do?',
+        text: variant === 0 ? 'If the machine transforms 3 5 7 into 5 7 9, what does it do?' : 'If the machine transforms 2 4 6 into 6 8 10, what does it do?',
         options: [{ text: 'Adds 2 to each number' }, { text: 'Subtracts 2 from each number' }, { text: 'Squares each number' }, { text: 'Reverses the order' }],
         correctIndex: 0,
         explanation: 'Each number is increased by 2.',
@@ -582,7 +603,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'How many times do the hands of a clock overlap in 12 hours?',
+        text: variant === 0 ? 'How many times do the hands of a clock overlap in 12 hours?' : 'How many times do the hands of a clock overlap in 24 hours?',
         options: [{ text: '11' }, { text: '12' }, { text: '10' }, { text: '24' }],
         correctIndex: 0,
         explanation: 'The hands overlap 11 times in 12 hours.',
@@ -595,7 +616,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'If 1st January is Monday, what day will 8th January be?',
+        text: variant === 0 ? 'If 1st January is Monday, what day will 8th January be?' : 'If 1st March is Friday, what day will 8th March be?',
         options: [{ text: 'Monday' }, { text: 'Tuesday' }, { text: 'Wednesday' }, { text: 'Sunday' }],
         correctIndex: 0,
         explanation: 'Seven days later falls on the same weekday.',
@@ -608,10 +629,10 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Choose the odd one out: Apple, Banana, Carrot, Mango.',
-        options: [{ text: 'Carrot' }, { text: 'Apple' }, { text: 'Banana' }, { text: 'Mango' }],
+        text: variant === 0 ? 'Choose the odd one out: Apple, Banana, Carrot, Mango.' : 'Choose the odd one out: Square, Triangle, Circle, Table.',
+        options: variant === 0 ? [{ text: 'Carrot' }, { text: 'Apple' }, { text: 'Banana' }, { text: 'Mango' }] : [{ text: 'Table' }, { text: 'Square' }, { text: 'Triangle' }, { text: 'Circle' }],
         correctIndex: 0,
-        explanation: 'Carrot is a vegetable while the others are fruits.',
+        explanation: variant === 0 ? 'Carrot is a vegetable while the others are fruits.' : 'Table is a piece of furniture while the others are shapes.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -621,10 +642,10 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Cause: It rained heavily. Effect: The ground became wet. What is the relationship?',
+        text: variant === 0 ? 'Cause: It rained heavily. Effect: The ground became wet. What is the relationship?' : 'Cause: The heater was switched on. Effect: The room became warm. What is the relationship?',
         options: [{ text: 'Cause leads to effect' }, { text: 'Effect leads to cause' }, { text: 'Both are unrelated' }, { text: 'No causal link' }],
         correctIndex: 0,
-        explanation: 'Rain causes the ground to become wet.',
+        explanation: variant === 0 ? 'Rain causes the ground to become wet.' : 'A heater causes the room to become warm.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -634,7 +655,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'Question: What is x? Statement I: x + 2 = 5. Statement II: x - 1 = 2.',
+        text: variant === 0 ? 'Question: What is x? Statement I: x + 2 = 5. Statement II: x - 1 = 2.' : 'Question: What is y? Statement I: 2y = 8. Statement II: y + 1 = 5.',
         options: [
           { text: 'Statement I alone is sufficient' },
           { text: 'Statement II alone is sufficient' },
@@ -642,7 +663,7 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
           { text: 'Neither statement is sufficient' },
         ],
         correctIndex: 2,
-        explanation: 'Either statement gives x = 3, so together they are sufficient.',
+        explanation: variant === 0 ? 'Either statement gives x = 3, so together they are sufficient.' : 'Either statement gives y = 4, so together they are sufficient.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -652,10 +673,10 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'If all engineers are thinkers and some thinkers are artists, which is definitely true?',
-        options: [{ text: 'All engineers are thinkers' }, { text: 'All thinkers are engineers' }, { text: 'All artists are engineers' }, { text: 'No thinkers are artists' }],
+        text: variant === 0 ? 'If all engineers are thinkers and some thinkers are artists, which is definitely true?' : 'If all roses are flowers and some flowers are red, which is definitely true?',
+        options: variant === 0 ? [{ text: 'All engineers are thinkers' }, { text: 'All thinkers are engineers' }, { text: 'All artists are engineers' }, { text: 'No thinkers are artists' }] : [{ text: 'All roses are flowers' }, { text: 'All flowers are roses' }, { text: 'All red things are flowers' }, { text: 'No flowers are red' }],
         correctIndex: 0,
-        explanation: 'The premise states all engineers are thinkers.',
+        explanation: variant === 0 ? 'The premise states all engineers are thinkers.' : 'The premise states all roses are flowers.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
@@ -665,10 +686,10 @@ function buildReasoningQuestion(topicIndex, questionIndex) {
         category: topic.category,
         topic: topic.topic,
         difficulty,
-        text: 'If A = 1 and B = 0, what is A AND B in binary logic?',
+        text: variant === 0 ? 'If A = 1 and B = 0, what is A AND B in binary logic?' : 'If A = 1 and B = 1, what is A OR B in binary logic?',
         options: [{ text: '0' }, { text: '1' }, { text: '2' }, { text: 'Undefined' }],
         correctIndex: 0,
-        explanation: 'AND is true only when both values are true.',
+        explanation: variant === 0 ? 'AND is true only when both values are true.' : 'OR is true when at least one value is true.',
         marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
         negativeMarks: 0.25,
       }
