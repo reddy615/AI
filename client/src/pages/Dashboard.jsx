@@ -20,8 +20,22 @@ export default function Dashboard() {
   const loadDashboard = async () => {
     setLoading(true)
     try {
-      const profileResponse = await api.get('/api/auth/me')
-      const profileData = profileResponse.data.data || profileResponse.data
+      const profileResponse = await api.get('/api/profile')
+      console.log('[dashboard] profile response inspection', {
+        data: profileResponse.data,
+        dataUser: profileResponse.data?.data?.user,
+        dataProfile: profileResponse.data?.data?.profile,
+        responseUser: profileResponse.data?.user,
+        responseProfile: profileResponse.data?.profile,
+      })
+
+      const profileData =
+        profileResponse.data?.data?.user ||
+        profileResponse.data?.user ||
+        profileResponse.data?.profile ||
+        profileResponse.data?.data ||
+        profileResponse.data
+
       setUser(profileData)
 
       const [analyticsResult, recommendationsResult, gamificationResult] = await Promise.allSettled([
