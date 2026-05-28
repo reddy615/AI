@@ -87,4 +87,16 @@ function generateAll(countPerModule=40){
   return out
 }
 
-module.exports = { generateAll }
+function generateModuleQuestions(module, countPerModule = 40) {
+  if (module === 'reasoning') {
+    return Array.from({ length: countPerModule }, (_, index) => generateReasoning(index));
+  }
+
+  if (module === 'verbal') {
+    return Array.from({ length: countPerModule }, (_, index) => generateVerbal(index));
+  }
+
+  return Array.from({ length: countPerModule }, (_, index) => generateAptitude(index));
+}
+
+module.exports = { generateAll, generateModuleQuestions }

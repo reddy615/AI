@@ -5,6 +5,27 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
+const { generateModuleQuestions } = require('../seed/questions');
+
+async function ensureQuizQuestions(module, match, redis, poolKey) {
+  const existingCount = await Question.countDocuments(match);
+  if (existingCount > 0) {
+    return true;
+  }
+
+  const generatedQuestions = generateModuleQuestions(module, 40);
+  if (!generatedQuestions.length) {
+    return false;
+  }
+
+  await Question.insertMany(generatedQuestions);
+
+  if (redis) {
+    await redis.del(poolKey);
+  }
+
+  return true;
+}
 
 // Start a quiz: fetch randomized questions based on query filters
 exports.startQuiz = asyncHandler(async (req, res) => {
@@ -29,6 +50,17 @@ exports.startQuiz = asyncHandler(async (req, res) => {
     questionIds = await Question.distinct('_id', match);
     if (redis) {
       await redis.set(poolKey, JSON.stringify(questionIds), 'EX', 600);
+    }
+  }
+
+  if (!questionIds.length) {
+    const seeded = await ensureQuizQuestions(module, match, redis, poolKey);
+
+    if (seeded) {
+      questionIds = await Question.distinct('_id', match);
+      if (redis) {
+        await redis.set(poolKey, JSON.stringify(questionIds), 'EX', 600);
+      }
     }
   }
 
