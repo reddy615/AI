@@ -1,6 +1,7 @@
 const Attempt = require('../models/Attempt');
 const CodingAttempt = require('../models/CodingAttempt');
 const { findLocalUserById } = require('../config/localUsers');
+const { localQuizAttemptStore } = require('../config/localQuizStore');
 
 function buildEmptyAnalytics(userId) {
   const localUser = findLocalUserById(userId);
@@ -28,7 +29,7 @@ function calculateWeakAreas(attempts) {
 
   for (const attempt of attempts) {
     for (const answer of attempt.answers || []) {
-      const topic = answer.questionId?.topic || 'General';
+      const topic = answer.topic || answer.questionId?.topic || 'General';
       const current = stats.get(topic) || { correct: 0, wrong: 0, skipped: 0, total: 0 };
       current.total += 1;
       if (answer.selectedIndex === null || answer.selectedIndex === undefined) {
@@ -53,7 +54,9 @@ function calculateWeakAreas(attempts) {
 
 async function getUserAnalytics(userId) {
   try {
-    const quizAttempts = await Attempt.find({ user: userId }).sort({ createdAt: 1 }).populate('answers.questionId').lean();
+    const dbQuizAttempts = await Attempt.find({ user: userId }).sort({ createdAt: 1 }).populate('answers.questionId').lean();
+    const localQuizAttempts = Array.from(localQuizAttemptStore.values()).filter((attempt) => String(attempt.user) === String(userId));
+    const quizAttempts = [...dbQuizAttempts, ...localQuizAttempts].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     const codingAttempts = await CodingAttempt.find({ user: userId }).populate('challenge').sort({ createdAt: -1 }).lean();
 
     const quizScores = quizAttempts.map((attempt) => ({

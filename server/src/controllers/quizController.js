@@ -6,9 +6,7 @@ const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
 const { generateModuleQuestions, generateAptitudeQuestionsForTopic, getAptitudeTopics } = require('../seed/questions');
-
-const localQuizQuestionStore = new Map();
-const localQuizAttemptStore = new Map();
+const { localQuizQuestionStore, localQuizAttemptStore } = require('../config/localQuizStore');
 
 function createLocalQuizId(module) {
   return `local-quiz-${module}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
