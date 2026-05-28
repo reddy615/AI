@@ -41,7 +41,6 @@ const topics = {
     { category: 'Logic', topic: 'Cause and Effect' },
     { category: 'Logic', topic: 'Data Sufficiency' },
     { category: 'Logic', topic: 'Logical Deduction' },
-    { category: 'Logic', topic: 'Binary Logic' },
   ],
   verbal: [
     { category: 'Vocabulary', topic: 'Synonyms' },
@@ -706,6 +705,14 @@ function generateReasoning(i) {
   return buildReasoningQuestion(i % topics.reasoning.length, i)
 }
 
+function generateReasoningQuestionsForTopic(topicIndex, count = 80) {
+  return Array.from({ length: count }, (_, questionIndex) => buildReasoningQuestion(topicIndex % topics.reasoning.length, questionIndex))
+}
+
+function generateReasoningTopicBank(perTopicCount = 80) {
+  return topics.reasoning.flatMap((_, topicIndex) => generateReasoningQuestionsForTopic(topicIndex, perTopicCount))
+}
+
 const vocab = ['happy', 'quick', 'bright', 'calm', 'ancient', 'brave', 'eager', 'fierce']
 const synonyms = { happy: 'joyful', quick: 'fast', bright: 'smart', calm: 'serene', ancient: 'old', brave: 'courageous', eager: 'enthusiastic', fierce: 'ferocious' }
 
@@ -763,6 +770,8 @@ module.exports = {
   generateModuleQuestions,
   generateAptitudeQuestionsForTopic,
   generateAptitudeTopicBank,
+  generateReasoningQuestionsForTopic,
+  generateReasoningTopicBank,
   getAptitudeTopics,
   getReasoningTopics,
 }

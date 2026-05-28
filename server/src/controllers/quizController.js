@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
-const { generateModuleQuestions, generateAptitudeQuestionsForTopic, getAptitudeTopics, getReasoningTopics } = require('../seed/questions');
+const { generateModuleQuestions, generateAptitudeQuestionsForTopic, generateReasoningQuestionsForTopic, getAptitudeTopics, getReasoningTopics } = require('../seed/questions');
 const { localQuizQuestionStore, localQuizAttemptStore } = require('../config/localQuizStore');
 
 function createLocalQuizId(module) {
@@ -56,17 +56,13 @@ function buildAptitudePracticeQuestions(perTopicCount = 2) {
 }
 
 function buildReasoningPracticeQuestions(perTopicCount = 2) {
-  const sourceQuestions = generateModuleQuestions('reasoning', 80);
-  const questionsByTopic = sourceQuestions.reduce((accumulator, question) => {
-    if (!accumulator[question.topic]) {
-      accumulator[question.topic] = [];
-    }
-    accumulator[question.topic].push(question);
-    return accumulator;
-  }, {});
+  const topicsToUse = getReasoningTopics()
+    .map((topic, originalIndex) => ({ ...topic, originalIndex }))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 18);
 
-  return getReasoningTopics().flatMap((topic) => {
-    const topicQuestions = questionsByTopic[topic.topic] || [];
+  return topicsToUse.flatMap((topic) => {
+    const topicQuestions = generateReasoningQuestionsForTopic(topic.originalIndex, 80);
     const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
     return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'reasoning'));
   });
