@@ -279,8 +279,10 @@ function BadgePill({ children }) {
   )
 }
 
-export function AptitudeResultAnalytics({ attempt, analytics, history = [], gamification = null, onBack }) {
+export function AptitudeResultAnalytics({ attempt, analytics, history = [], gamification = null, onBack, module }) {
   const [showAnswers, setShowAnswers] = useState(false)
+  const assessmentModule = (module || attempt?.module || 'aptitude').toLowerCase()
+  const moduleLabel = assessmentModule === 'reasoning' ? 'Reasoning' : 'Aptitude'
 
   const model = useMemo(() => buildAptitudeAnalytics({ attempt, analytics, history, gamification }), [attempt, analytics, history, gamification])
 
@@ -300,8 +302,8 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
         <motion.div className="mx-auto flex max-w-7xl flex-col gap-6" variants={containerVariants} initial="hidden" animate="show">
           <motion.div variants={itemVariants} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <div className="text-xs uppercase tracking-[0.32em] text-cyan-300/85">Aptitude Intelligence</div>
-              <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Premium Result Analytics</h1>
+              <div className="text-xs uppercase tracking-[0.32em] text-cyan-300/85">{moduleLabel} Intelligence</div>
+              <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{moduleLabel} Result Analytics</h1>
               <p className="max-w-3xl text-sm text-white/60 sm:text-base">A luxury, AI-style performance breakdown with topic intelligence, charts, insights, and answer review.</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -578,7 +580,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
           <section className="space-y-4">
             <SectionHeading
               eyebrow="Answer review"
-              title="View every answer"
+              title={`View every ${moduleLabel.toLowerCase()} answer`}
               subtitle="Open the answer review to see selected responses and the correct answers for every question in this quiz."
               icon={CheckCircle2}
             />
@@ -644,7 +646,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
           </section>
 
           <div className="flex items-center justify-between border-t border-white/10 pt-4 text-sm text-white/45">
-            <div>Generated for {attempt.module?.toUpperCase() || 'APTITUDE'} assessment</div>
+            <div>Generated for {assessmentModule.toUpperCase()} assessment</div>
             {onBack ? (
               <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-cyan-300 transition hover:text-cyan-200">
                 Back to dashboard <ChevronRight className="h-4 w-4" />

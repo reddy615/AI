@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { getRedisClient } = require('../config/redis');
 const { recordActivity } = require('../services/gamificationService');
-const { generateModuleQuestions, generateAptitudeQuestionsForTopic, getAptitudeTopics } = require('../seed/questions');
+const { generateModuleQuestions, generateAptitudeQuestionsForTopic, getAptitudeTopics, getReasoningTopics } = require('../seed/questions');
 const { localQuizQuestionStore, localQuizAttemptStore } = require('../config/localQuizStore');
 
 function createLocalQuizId(module) {
@@ -52,6 +52,23 @@ function buildAptitudePracticeQuestions(perTopicCount = 2) {
     const topicQuestions = generateAptitudeQuestionsForTopic(topicIndex, 80);
     const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
     return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'aptitude'));
+  });
+}
+
+function buildReasoningPracticeQuestions(perTopicCount = 2) {
+  const sourceQuestions = generateModuleQuestions('reasoning', 80);
+  const questionsByTopic = sourceQuestions.reduce((accumulator, question) => {
+    if (!accumulator[question.topic]) {
+      accumulator[question.topic] = [];
+    }
+    accumulator[question.topic].push(question);
+    return accumulator;
+  }, {});
+
+  return getReasoningTopics().flatMap((topic) => {
+    const topicQuestions = questionsByTopic[topic.topic] || [];
+    const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
+    return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'reasoning'));
   });
 }
 
@@ -146,6 +163,11 @@ exports.startQuiz = asyncHandler(async (req, res) => {
 
   if (module === 'aptitude') {
     const payload = buildAptitudePracticeQuestions(2);
+    return res.apiSuccess({ questions: payload, count: payload.length }, 'Quiz loaded');
+  }
+
+  if (module === 'reasoning') {
+    const payload = buildReasoningPracticeQuestions(2);
     return res.apiSuccess({ questions: payload, count: payload.length }, 'Quiz loaded');
   }
 

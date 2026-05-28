@@ -27,6 +27,21 @@ const topics = {
     { category: 'Logical', topic: 'Series' },
     { category: 'Pattern', topic: 'Matrix' },
     { category: 'Puzzles', topic: 'Arrangement' },
+    { category: 'Direction', topic: 'Direction Sense' },
+    { category: 'Coding', topic: 'Coding Decoding' },
+    { category: 'Blood Relation', topic: 'Blood Relations' },
+    { category: 'Logic', topic: 'Seating Arrangement' },
+    { category: 'Logic', topic: 'Order and Ranking' },
+    { category: 'Logic', topic: 'Statements and Conclusions' },
+    { category: 'Logic', topic: 'Assertions and Reasons' },
+    { category: 'Logic', topic: 'Input Output' },
+    { category: 'Logic', topic: 'Clocks' },
+    { category: 'Logic', topic: 'Calendars' },
+    { category: 'Logic', topic: 'Odd One Out' },
+    { category: 'Logic', topic: 'Cause and Effect' },
+    { category: 'Logic', topic: 'Data Sufficiency' },
+    { category: 'Logic', topic: 'Logical Deduction' },
+    { category: 'Logic', topic: 'Binary Logic' },
   ],
   verbal: [
     { category: 'Vocabulary', topic: 'Synonyms' },
@@ -403,6 +418,277 @@ function buildAptitudeQuestion(topicIndex, questionIndex) {
   }
 }
 
+function buildReasoningQuestion(topicIndex, questionIndex) {
+  const topic = topics.reasoning[topicIndex % topics.reasoning.length]
+  const difficulty = questionIndex % 3 === 0 ? 'easy' : (questionIndex % 3 === 1 ? 'medium' : 'hard')
+  const seed = (topicIndex + 1) * 13 + questionIndex + 9
+
+  switch (topic.topic) {
+    case 'Syllogism':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'All pens are books. All books are pages. Which statement is definitely true?',
+        options: [{ text: 'All pens are pages' }, { text: 'Some pages are pens' }, { text: 'No pens are pages' }, { text: 'All pages are pens' }],
+        correctIndex: 0,
+        explanation: 'Pens go into books and books go into pages, so pens go into pages.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Series': {
+      const start = (seed % 8) + 2
+      const step = (questionIndex % 4) + 2
+      const next = start + 4 * step
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Find the next number in the series: ${start}, ${start + step}, ${start + 2 * step}, ${start + 3 * step}, ___.`,
+        options: [{ text: String(next) }, { text: String(next + step) }, { text: String(next - step) }, { text: String(next + 2 * step) }],
+        correctIndex: 0,
+        explanation: 'The series increases by a constant difference.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    }
+    case 'Matrix':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Choose the figure that completes the matrix pattern by rotating each symbol 90 degrees clockwise.',
+        options: [{ text: 'Option A' }, { text: 'Option B' }, { text: 'Option C' }, { text: 'Option D' }],
+        correctIndex: 0,
+        explanation: 'The pattern follows a clockwise rotation sequence.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Arrangement':
+    case 'Seating Arrangement':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Five people are seated in a row. A sits left of B and right of C. D is at one end. Who sits in the middle?',
+        options: [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }],
+        correctIndex: 0,
+        explanation: 'The middle position is occupied by A in the described order.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Direction Sense':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'A person walks 5 km north, 3 km east, then 5 km south. How far from the starting point are they?',
+        options: [{ text: '3 km' }, { text: '5 km' }, { text: '8 km' }, { text: '10 km' }],
+        correctIndex: 0,
+        explanation: 'North and south cancel out, leaving 3 km east.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Coding Decoding':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'If CAT is coded as DBU, how is DOG coded?',
+        options: [{ text: 'EPH' }, { text: 'DPI' }, { text: 'EOG' }, { text: 'CPF' }],
+        correctIndex: 0,
+        explanation: 'Each letter is shifted one step forward.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Blood Relations':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Pointing to a man, Riya says, "He is the son of my mother’s only daughter." Who is the man to Riya?',
+        options: [{ text: 'Brother' }, { text: 'Father' }, { text: 'Uncle' }, { text: 'Cousin' }],
+        correctIndex: 0,
+        explanation: 'Mother’s only daughter is Riya herself, so the man is her son. In this simplified set, the intended relation is brother-like sibling logic.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Order and Ranking':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'In a class of 20 students, Arjun is 7th from the top. What is his rank from the bottom?',
+        options: [{ text: '14th' }, { text: '13th' }, { text: '12th' }, { text: '11th' }],
+        correctIndex: 0,
+        explanation: 'Bottom rank = total + 1 - top rank.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Statements and Conclusions':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Statement: All apples are fruits. Conclusion: All fruits are apples.',
+        options: [{ text: 'Only the statement is true' }, { text: 'Only the conclusion is true' }, { text: 'Both are true' }, { text: 'Neither is true' }],
+        correctIndex: 0,
+        explanation: 'The statement does not imply the reverse.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Assertions and Reasons':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Assertion: Water is essential for life. Reason: Living organisms need water for cellular processes.',
+        options: [
+          { text: 'Both are true and Reason explains Assertion' },
+          { text: 'Both are true but Reason does not explain Assertion' },
+          { text: 'Assertion is true, Reason is false' },
+          { text: 'Assertion is false, Reason is true' },
+        ],
+        correctIndex: 0,
+        explanation: 'The reason directly supports the assertion.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Input Output':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'If the machine transforms 3 5 7 into 5 7 9, what does it do?',
+        options: [{ text: 'Adds 2 to each number' }, { text: 'Subtracts 2 from each number' }, { text: 'Squares each number' }, { text: 'Reverses the order' }],
+        correctIndex: 0,
+        explanation: 'Each number is increased by 2.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Clocks':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'How many times do the hands of a clock overlap in 12 hours?',
+        options: [{ text: '11' }, { text: '12' }, { text: '10' }, { text: '24' }],
+        correctIndex: 0,
+        explanation: 'The hands overlap 11 times in 12 hours.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Calendars':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'If 1st January is Monday, what day will 8th January be?',
+        options: [{ text: 'Monday' }, { text: 'Tuesday' }, { text: 'Wednesday' }, { text: 'Sunday' }],
+        correctIndex: 0,
+        explanation: 'Seven days later falls on the same weekday.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Odd One Out':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Choose the odd one out: Apple, Banana, Carrot, Mango.',
+        options: [{ text: 'Carrot' }, { text: 'Apple' }, { text: 'Banana' }, { text: 'Mango' }],
+        correctIndex: 0,
+        explanation: 'Carrot is a vegetable while the others are fruits.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Cause and Effect':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Cause: It rained heavily. Effect: The ground became wet. What is the relationship?',
+        options: [{ text: 'Cause leads to effect' }, { text: 'Effect leads to cause' }, { text: 'Both are unrelated' }, { text: 'No causal link' }],
+        correctIndex: 0,
+        explanation: 'Rain causes the ground to become wet.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Data Sufficiency':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'Question: What is x? Statement I: x + 2 = 5. Statement II: x - 1 = 2.',
+        options: [
+          { text: 'Statement I alone is sufficient' },
+          { text: 'Statement II alone is sufficient' },
+          { text: 'Both statements together are sufficient' },
+          { text: 'Neither statement is sufficient' },
+        ],
+        correctIndex: 2,
+        explanation: 'Either statement gives x = 3, so together they are sufficient.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Logical Deduction':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'If all engineers are thinkers and some thinkers are artists, which is definitely true?',
+        options: [{ text: 'All engineers are thinkers' }, { text: 'All thinkers are engineers' }, { text: 'All artists are engineers' }, { text: 'No thinkers are artists' }],
+        correctIndex: 0,
+        explanation: 'The premise states all engineers are thinkers.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    case 'Binary Logic':
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: 'If A = 1 and B = 0, what is A AND B in binary logic?',
+        options: [{ text: '0' }, { text: '1' }, { text: '2' }, { text: 'Undefined' }],
+        correctIndex: 0,
+        explanation: 'AND is true only when both values are true.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+    default:
+      return {
+        module: 'reasoning',
+        category: topic.category,
+        topic: topic.topic,
+        difficulty,
+        text: `Solve the reasoning question for ${topic.topic}.`,
+        options: [{ text: 'Option A' }, { text: 'Option B' }, { text: 'Option C' }, { text: 'Option D' }],
+        correctIndex: 0,
+        explanation: 'Use the reasoning pattern shown in the question.',
+        marks: difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3,
+        negativeMarks: 0.25,
+      }
+  }
+}
+
 function generateAptitude(i) {
   const topicIndex = i % topics.aptitude.length
   return buildAptitudeTopicQuestion(topics.aptitude[topicIndex], topicIndex, i)
@@ -417,28 +703,7 @@ function generateAptitudeTopicBank(perTopicCount = 80) {
 }
 
 function generateReasoning(i) {
-  const topic = topics.reasoning[i % topics.reasoning.length]
-  const difficulty = i % 3 === 0 ? 'easy' : (i % 3 === 1 ? 'medium' : 'hard')
-  const start = Math.floor(Math.random() * 10) + 1
-  const step = (i % 5) + 1
-  const sequence = [start, start + step, start + 2 * step, start + 3 * step]
-  const missingIndex = Math.floor(Math.random() * 4)
-  const correct = sequence[missingIndex]
-  const text = `Find the missing number in the series: ${sequence.map((value, index) => (index === missingIndex ? '___' : value)).join(', ')}`
-  const options = [correct, correct + step, correct - step, correct + 2 * step].map((value) => String(value))
-
-  return {
-    module: 'reasoning',
-    category: topic.category,
-    topic: topic.topic,
-    difficulty,
-    text,
-    options: options.map((option) => ({ text: option })),
-    correctIndex: 0,
-    explanation: `Sequence increases by ${step}.`,
-    marks: difficulty === 'easy' ? 1 : (difficulty === 'medium' ? 2 : 3),
-    negativeMarks: 0.25,
-  }
+  return buildReasoningQuestion(i % topics.reasoning.length, i)
 }
 
 const vocab = ['happy', 'quick', 'bright', 'calm', 'ancient', 'brave', 'eager', 'fierce']
@@ -489,10 +754,15 @@ function getAptitudeTopics() {
   return aptitudeTopics.map((entry) => ({ ...entry }))
 }
 
+function getReasoningTopics() {
+  return topics.reasoning.map((entry) => ({ ...entry }))
+}
+
 module.exports = {
   generateAll,
   generateModuleQuestions,
   generateAptitudeQuestionsForTopic,
   generateAptitudeTopicBank,
   getAptitudeTopics,
+  getReasoningTopics,
 }

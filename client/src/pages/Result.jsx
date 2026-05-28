@@ -58,13 +58,14 @@ export default function Result() {
 
   const { attempt, analytics } = data
 
-  if (attempt?.module === 'aptitude') {
+  if (attempt?.module === 'aptitude' || attempt?.module === 'reasoning') {
     return (
       <AptitudeResultAnalytics
         attempt={attempt}
         analytics={analytics}
         history={history}
         gamification={gamification}
+        module={attempt?.module}
         onBack={() => navigate('/dashboard')}
       />
     )

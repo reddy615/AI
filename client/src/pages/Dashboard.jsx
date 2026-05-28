@@ -285,7 +285,7 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold text-slate-900">Quick Actions</h3>
             <div className="mt-4 grid gap-3">
               <button onClick={() => navigate(`/quiz?module=aptitude&count=36&refresh=${Date.now()}`)} className="rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-semibold text-white">Practice Aptitude</button>
-              <button onClick={() => navigate('/quiz?module=reasoning&count=10')} className="rounded-xl bg-slate-800 px-4 py-3 text-left text-sm font-semibold text-white">Practice Reasoning</button>
+              <button onClick={() => navigate(`/quiz?module=reasoning&count=36&refresh=${Date.now()}`)} className="rounded-xl bg-slate-800 px-4 py-3 text-left text-sm font-semibold text-white">Practice Reasoning</button>
               <button onClick={() => navigate('/quiz?module=verbal&count=10')} className="rounded-xl bg-slate-700 px-4 py-3 text-left text-sm font-semibold text-white">Practice Verbal</button>
               <button onClick={() => navigate('/coding')} className="rounded-xl bg-blue-600 px-4 py-3 text-left text-sm font-semibold text-white">Start Coding Assessment</button>
               <button onClick={() => navigate('/ai')} className="rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold text-white">Generate AI Questions</button>
