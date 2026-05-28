@@ -20,22 +20,36 @@ export default function Dashboard() {
   const loadDashboard = async () => {
     setLoading(true)
     try {
-      const [profileResponse, analyticsResponse, recommendationsResponse, gamificationResponse] = await Promise.all([
-        api.get('/api/auth/me'),
+      const profileResponse = await api.get('/api/auth/me')
+      const profileData = profileResponse.data.data || profileResponse.data
+      setUser(profileData)
+
+      const [analyticsResult, recommendationsResult, gamificationResult] = await Promise.allSettled([
         api.get('/api/analytics/overview'),
         api.get('/api/analytics/recommendations'),
         api.get('/api/gamification/me'),
       ])
 
-      const profileData = profileResponse.data.data || profileResponse.data
-      const analyticsData = analyticsResponse.data.data?.analytics || analyticsResponse.data.analytics
-      const recommendationsData = recommendationsResponse.data.data?.recommendations || recommendationsResponse.data.recommendations || []
-      const gamificationData = gamificationResponse.data.data || gamificationResponse.data
+      if (analyticsResult.status === 'fulfilled') {
+        const analyticsResponse = analyticsResult.value
+        setAnalytics(analyticsResponse.data.data?.analytics || analyticsResponse.data.analytics)
+      } else {
+        console.warn('Dashboard analytics failed to load', analyticsResult.reason)
+      }
 
-      setUser(profileData)
-      setAnalytics(analyticsData)
-      setRecommendations(recommendationsData)
-      setGamification(gamificationData)
+      if (recommendationsResult.status === 'fulfilled') {
+        const recommendationsResponse = recommendationsResult.value
+        setRecommendations(recommendationsResponse.data.data?.recommendations || recommendationsResponse.data.recommendations || [])
+      } else {
+        console.warn('Dashboard recommendations failed to load', recommendationsResult.reason)
+      }
+
+      if (gamificationResult.status === 'fulfilled') {
+        const gamificationResponse = gamificationResult.value
+        setGamification(gamificationResponse.data.data || gamificationResponse.data)
+      } else {
+        console.warn('Dashboard gamification failed to load', gamificationResult.reason)
+      }
     } catch (error) {
       console.error(error)
     } finally {

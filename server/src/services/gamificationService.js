@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const UserProgress = require('../models/UserProgress');
 const { getRedisClient } = require('../config/redis');
+const { findLocalUserById } = require('../config/localUsers');
+const { buildDefaultProgress, getLocalUserProgress, listLocalLeaderboard, upsertLocalUserProgress } = require('../config/localGamification');
 
 const BADGES = [
   { key: 'first-quiz', title: 'First Quiz', description: 'Completed your first quiz attempt.' },
@@ -74,18 +76,49 @@ function evaluateBadges(progress, activity) {
 }
 
 async function ensureProgress(userId) {
-  let progress = await UserProgress.findOne({ user: userId });
-  if (!progress) {
-    const user = await User.findById(userId).select('preferredLanguage');
-    progress = await UserProgress.create({ user: userId, preferredLanguage: user?.preferredLanguage || 'en' });
+  const localUser = findLocalUserById(userId);
+  if (localUser) {
+    return getLocalUserProgress(localUser.id) || buildDefaultProgress(localUser);
   }
-  return progress;
+
+  try {
+    let progress = await UserProgress.findOne({ user: userId });
+    if (!progress) {
+      const user = await User.findById(userId).select('preferredLanguage');
+      progress = await UserProgress.create({ user: userId, preferredLanguage: user?.preferredLanguage || 'en' });
+    }
+    return progress;
+  } catch (error) {
+    const fallbackUser = findLocalUserById(userId);
+    if (fallbackUser) {
+      return getLocalUserProgress(fallbackUser.id) || buildDefaultProgress(fallbackUser);
+    }
+    return buildDefaultProgress({ id: String(userId), preferredLanguage: 'en' });
+  }
 }
 
 async function recordActivity({ userId, source, score = 0, accuracy = 0, module = '', durationSeconds = 0 }) {
-  const progress = await ensureProgress(userId);
   const now = new Date();
   const xp = calculateXp({ source, score, accuracy, durationSeconds });
+  const progress = await ensureProgress(userId);
+  if (progress?.user && typeof progress.save !== 'function') {
+    const nextProgress = {
+      ...progress,
+      xp: (progress.xp || 0) + xp,
+      level: getLevelFromXp((progress.xp || 0) + xp),
+      recentActivities: [{ type: source, source, xp, score, module, createdAt: now }, ...(progress.recentActivities || [])].slice(0, 20),
+      lastActivityAt: now,
+    };
+
+    const localUpdated = upsertLocalUserProgress(progress.user, nextProgress);
+    return {
+      progress: localUpdated || nextProgress,
+      unlockedBadges: [],
+      xpGained: xp,
+      levelUp: (localUpdated || nextProgress).level,
+    };
+  }
+
   const lastActivityAt = progress.lastActivityAt ? new Date(progress.lastActivityAt) : null;
   const lastDay = lastActivityAt ? startOfDay(lastActivityAt) : null;
   const currentDay = startOfDay(now);
@@ -151,30 +184,34 @@ async function getLeaderboard(limit = 10) {
     }
   }
 
-  const progress = await UserProgress.find({})
-    .sort({ xp: -1, longestStreak: -1, updatedAt: -1 })
-    .limit(safeLimit)
-    .populate('user', 'name email role preferredLanguage')
-    .lean();
+  try {
+    const progress = await UserProgress.find({})
+      .sort({ xp: -1, longestStreak: -1, updatedAt: -1 })
+      .limit(safeLimit)
+      .populate('user', 'name email role preferredLanguage')
+      .lean();
 
-  const leaderboard = progress.map((item, index) => ({
-    rank: index + 1,
-    userId: String(item.user?._id || item.user),
-    name: item.user?.name || 'Learner',
-    email: item.user?.email || '',
-    role: item.user?.role || 'user',
-    preferredLanguage: item.user?.preferredLanguage || item.preferredLanguage || 'en',
-    xp: item.xp || 0,
-    level: item.level || getLevelFromXp(item.xp || 0),
-    streak: item.streak || 0,
-    badges: item.badges || [],
-  }));
+    const leaderboard = progress.map((item, index) => ({
+      rank: index + 1,
+      userId: String(item.user?._id || item.user),
+      name: item.user?.name || 'Learner',
+      email: item.user?.email || '',
+      role: item.user?.role || 'user',
+      preferredLanguage: item.user?.preferredLanguage || item.preferredLanguage || 'en',
+      xp: item.xp || 0,
+      level: item.level || getLevelFromXp(item.xp || 0),
+      streak: item.streak || 0,
+      badges: item.badges || [],
+    }));
 
-  if (redis) {
-    await redis.set(cacheKey, JSON.stringify(leaderboard), 'EX', Number(process.env.LEADERBOARD_CACHE_TTL_SECONDS || 300));
+    if (redis) {
+      await redis.set(cacheKey, JSON.stringify(leaderboard), 'EX', Number(process.env.LEADERBOARD_CACHE_TTL_SECONDS || 300));
+    }
+
+    return leaderboard;
+  } catch (error) {
+    return listLocalLeaderboard().slice(0, safeLimit);
   }
-
-  return leaderboard;
 }
 
 async function getProgress(userId) {
