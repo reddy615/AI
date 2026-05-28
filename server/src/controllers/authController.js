@@ -3,9 +3,10 @@ const bcrypt = require('bcryptjs');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const { findLocalUserByEmail, findLocalUserById } = require('../config/localUsers');
 
 function buildTokenPayload(user) {
-  return { id: String(user._id), role: user.role, ver: user.refreshTokenVersion };
+  return { id: String(user._id || user.id || user.email), role: user.role, ver: user.refreshTokenVersion };
 }
 
 function setRefreshCookie(res, token) {
@@ -39,7 +40,7 @@ function attachAuthPayload(res, user, tokens, message) {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       user: {
-        id: String(user._id),
+        id: String(user._id || user.id || user.email),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -65,27 +66,61 @@ exports.register = asyncHandler(async (req, res) => {
 
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user || !user.isActive) return sendError(res, 'Invalid credentials', 400);
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return sendError(res, 'Invalid credentials', 400);
-  const tokens = issueTokens(user);
+  try {
+    const user = await User.findOne({ email });
+    if (user && user.isActive && typeof user.password === 'string' && user.password) {
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) return sendError(res, 'Invalid credentials', 400);
+      const tokens = issueTokens(user);
+      setRefreshCookie(res, tokens.refreshToken);
+      return attachAuthPayload(res, user, tokens, 'Login successful');
+    }
+  } catch (error) {
+    console.warn('[auth:login] database lookup failed, falling back to local user store', { email, error: error.message });
+  }
+
+  const localUser = findLocalUserByEmail(email);
+  if (!localUser || localUser.password !== password) {
+    return sendError(res, 'Invalid credentials', 400);
+  }
+
+  const tokens = issueTokens(localUser);
   setRefreshCookie(res, tokens.refreshToken);
-  return attachAuthPayload(res, user, tokens, 'Login successful');
+  return attachAuthPayload(res, localUser, tokens, 'Login successful');
 });
 
 exports.me = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).select('-password');
-  if (!user) return sendError(res, 'User not found', 404);
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (user) {
+      return res.apiSuccess(
+        {
+          id: String(user._id),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          preferredLanguage: user.preferredLanguage || 'en',
+          resume: user.resume,
+          isActive: user.isActive,
+        },
+        'Profile loaded'
+      );
+    }
+  } catch (error) {
+    // Fall back to local user storage below.
+  }
+
+  const localUser = findLocalUserById(req.user.id);
+  if (!localUser) return sendError(res, 'User not found', 404);
   return res.apiSuccess(
     {
-      id: String(user._id),
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      preferredLanguage: user.preferredLanguage || 'en',
-      resume: user.resume,
-      isActive: user.isActive,
+      id: String(localUser.id),
+      name: localUser.name,
+      email: localUser.email,
+      role: localUser.role,
+      preferredLanguage: localUser.preferredLanguage || 'en',
+      resume: localUser.resume,
+      isActive: localUser.isActive,
     },
     'Profile loaded'
   );
@@ -102,15 +137,30 @@ exports.refresh = asyncHandler(async (req, res) => {
     return sendError(res, 'Refresh token invalid or expired', 401);
   }
 
-  const user = await User.findById(decoded.id);
-  if (!user || !user.isActive) return sendError(res, 'Unauthorized', 401);
-  if (typeof decoded.ver === 'number' && decoded.ver !== user.refreshTokenVersion) {
+  try {
+    const user = await User.findById(decoded.id);
+    if (user && user.isActive) {
+      if (typeof decoded.ver === 'number' && decoded.ver !== user.refreshTokenVersion) {
+        return sendError(res, 'Refresh token expired', 401);
+      }
+
+      const tokens = issueTokens(user);
+      setRefreshCookie(res, tokens.refreshToken);
+      return attachAuthPayload(res, user, tokens, 'Token refreshed');
+    }
+  } catch (error) {
+    // Fall back to local user storage below.
+  }
+
+  const localUser = findLocalUserById(decoded.id);
+  if (!localUser || !localUser.isActive) return sendError(res, 'Unauthorized', 401);
+  if (typeof decoded.ver === 'number' && decoded.ver !== localUser.refreshTokenVersion) {
     return sendError(res, 'Refresh token expired', 401);
   }
 
-  const tokens = issueTokens(user);
+  const tokens = issueTokens(localUser);
   setRefreshCookie(res, tokens.refreshToken);
-  return attachAuthPayload(res, user, tokens, 'Token refreshed');
+  return attachAuthPayload(res, localUser, tokens, 'Token refreshed');
 });
 
 exports.logout = asyncHandler(async (req, res) => {
@@ -118,10 +168,17 @@ exports.logout = asyncHandler(async (req, res) => {
   if (incoming) {
     try {
       const decoded = verifyRefreshToken(incoming);
-      const user = await User.findById(decoded.id);
-      if (user) {
-        user.refreshTokenVersion += 1;
-        await user.save();
+      try {
+        const user = await User.findById(decoded.id);
+        if (user) {
+          user.refreshTokenVersion += 1;
+          await user.save();
+        }
+      } catch (error) {
+        const localUser = findLocalUserById(decoded.id);
+        if (localUser) {
+          localUser.refreshTokenVersion += 1;
+        }
       }
     } catch (error) {
       // ignore invalid refresh token during logout

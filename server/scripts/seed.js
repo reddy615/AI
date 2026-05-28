@@ -8,12 +8,40 @@ dotenv.config()
 const connectDB = require('../src/config/db')
 const Question = require('../src/models/Question')
 const CodingChallenge = require('../src/models/CodingChallenge')
+const User = require('../src/models/User')
+const bcrypt = require('bcryptjs')
+const { LOCAL_USERS } = require('../src/config/localUsers')
 const { generateAll } = require('../src/seed/questions')
 const { generateCodingChallenges } = require('../src/seed/codingChallenges')
+
+async function seedUsers(force){
+  for (const defaultUser of LOCAL_USERS){
+    const hash = await bcrypt.hash(defaultUser.password, 10)
+    await User.updateOne(
+      { email: defaultUser.email },
+      {
+        $set: {
+          name: defaultUser.name,
+          email: defaultUser.email,
+          password: hash,
+          role: defaultUser.role || 'user',
+          isActive: true,
+        },
+        $setOnInsert: {
+          preferredLanguage: 'en',
+          refreshTokenVersion: 0,
+        },
+      },
+      { upsert: true }
+    )
+    console.log(`Ensured login account exists for ${defaultUser.email}${force ? ' (force mode)' : ''}`)
+  }
+}
 
 async function run(){
   await connectDB()
   const force = process.argv.includes('--force')
+  await seedUsers(force)
   const count = await Question.countDocuments()
   const codingCount = await CodingChallenge.countDocuments()
 
