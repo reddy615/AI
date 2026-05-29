@@ -1,3 +1,23 @@
+function validateTestCases(title, testCases) {
+  if (!Array.isArray(testCases) || testCases.length === 0) {
+    throw new Error(`Coding challenge "${title}" must include at least one test case.`)
+  }
+
+  testCases.forEach((testCase, index) => {
+    if (!testCase || typeof testCase !== 'object') {
+      throw new Error(`Coding challenge "${title}" test case ${index + 1} must be an object.`)
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(testCase, 'input')) {
+      throw new Error(`Coding challenge "${title}" test case ${index + 1} is missing input.`)
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(testCase, 'expectedOutput')) {
+      throw new Error(`Coding challenge "${title}" test case ${index + 1} is missing expectedOutput.`)
+    }
+  })
+}
+
 function buildChallenge({
   title,
   language,
@@ -10,6 +30,8 @@ function buildChallenge({
   timeLimitMinutes = 30,
   constraints = [],
 }) {
+  validateTestCases(title, testCases)
+
   const publicSample = testCases[0] || { input: '', expectedOutput: '' }
 
   return {

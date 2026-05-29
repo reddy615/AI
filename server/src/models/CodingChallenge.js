@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const testCaseSchema = new mongoose.Schema({
   input: { type: String, required: true },
-  expectedOutput: { type: String, required: true },
+  expectedOutput: { type: String, default: '' },
 }, { _id: false });
 
 const codingChallengeSchema = new mongoose.Schema({
