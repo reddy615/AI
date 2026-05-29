@@ -9,6 +9,11 @@ function formatPercent(value) {
   return `${Number(value || 0)}%`
 }
 
+function getResumeName(resumePath) {
+  if (!resumePath) return ''
+  return String(resumePath).split('/').filter(Boolean).pop() || ''
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [analytics, setAnalytics] = useState(null)
@@ -217,6 +222,19 @@ export default function Dashboard() {
                   <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
                   <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
                   <p><span className="font-semibold text-slate-900">Resume:</span> {user?.resume ? 'Uploaded' : 'Not uploaded'}</p>
+                  {user?.resume ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saved File</div>
+                      <a
+                        href={user.resume}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex break-all text-sm font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        {getResumeName(user.resume) || 'Open uploaded resume'}
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
 
                 <form onSubmit={uploadResume} className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">

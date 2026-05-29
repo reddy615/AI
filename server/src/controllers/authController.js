@@ -45,6 +45,7 @@ function attachAuthPayload(res, user, tokens, message) {
         email: user.email,
         role: user.role,
         preferredLanguage: user.preferredLanguage || 'en',
+        resume: user.resume,
       },
     },
     message,
