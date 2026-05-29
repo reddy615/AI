@@ -59,6 +59,7 @@ process.env.LOG_LEVEL = env.LOG_LEVEL;
 
 const app = require('./src/app');
 const registerInterviewSocket = require('./src/realtime/interviewSocket');
+const { ensureCodingChallengesSeeded } = require('./src/seed/ensureCodingChallenges');
 
 function getCorsOrigins() {
   return String(env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173')
@@ -81,7 +82,18 @@ if (hasRedisUrl) {
 }
 
 Promise.all(startupTasks)
-  .then(() => {
+  .then(async () => {
+    if (hasMongoUri) {
+      try {
+        const seedResult = await ensureCodingChallengesSeeded();
+        if (seedResult.seeded) {
+          console.log(`Seeded ${seedResult.count} coding challenges`);
+        }
+      } catch (error) {
+        console.warn('Unable to auto-seed coding challenges on startup:', error.message);
+      }
+    }
+
     const PORT = process.env.PORT || 5000;
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);

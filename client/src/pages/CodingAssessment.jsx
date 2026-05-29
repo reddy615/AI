@@ -22,6 +22,11 @@ function normalizeLanguage(value) {
   return LANGUAGES.some((item) => item.value === language) ? language : 'javascript'
 }
 
+function getChallengeDescription(prompt = '') {
+  const match = String(prompt).match(/Description:\s*([\s\S]*?)(?:\n\nExamples:|\n\nConstraints:|$)/i)
+  return match ? match[1].trim() : String(prompt).trim()
+}
+
 export default function CodingAssessment() {
   const [challenges, setChallenges] = useState([])
   const [selectedChallengeId, setSelectedChallengeId] = useState(null)
@@ -38,6 +43,7 @@ export default function CodingAssessment() {
 
   const loadChallenges = async () => {
     setLoading(true)
+    console.log('[coding] frontend loadChallenges:start')
     try {
       const [challengeResponse, leaderboardResponse] = await Promise.all([
         api.get('/api/coding/challenges?limit=12'),
@@ -47,14 +53,14 @@ export default function CodingAssessment() {
       const challengeList = challengeResponse.data.data?.challenges || challengeResponse.data.challenges || []
       const leaderboardList = leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || []
 
+      console.log('[coding] frontend challenge API response', {
+        challengeCount: challengeList.length,
+        leaderboardCount: leaderboardList.length,
+        firstChallengeId: challengeList[0]?._id || null,
+      })
+
       setChallenges(challengeList)
       setLeaderboard(leaderboardList)
-      if (!selectedChallengeId && challengeList.length) {
-        setSelectedChallengeId(challengeList[0]._id)
-        setChallenge(challengeList[0])
-        setLanguage(normalizeLanguage(challengeList[0].language))
-        setSourceCode(challengeList[0].starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
-      }
     } catch (error) {
       console.error(error)
     } finally {
@@ -67,16 +73,44 @@ export default function CodingAssessment() {
   }, [])
 
   useEffect(() => {
-    if (!selectedChallengeId) return
-    const selected = challenges.find((item) => item._id === selectedChallengeId)
-    if (selected) {
-      setChallenge(selected)
-      setLanguage(normalizeLanguage(selected.language))
-      setSourceCode(selected.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
-      setSubmission(null)
-      setRunError('')
+    console.log('[coding] frontend challenges state', {
+      loading,
+      count: challenges.length,
+      firstChallengeId: challenges[0]?._id || null,
+    })
+  }, [loading, challenges])
+
+  useEffect(() => {
+    if (!challenges.length) {
+      setChallenge(null)
+      setSelectedChallengeId(null)
+      console.log('[coding] frontend selectedChallenge state', { selectedChallengeId: null, challengeId: null })
+      return
     }
-  }, [selectedChallengeId, challenges])
+
+    const selected = selectedChallengeId ? challenges.find((item) => item._id === selectedChallengeId) : null
+    const challengeToUse = selected || challenges[0]
+
+    if (challengeToUse) {
+      if (challengeToUse._id !== selectedChallengeId) {
+        setSelectedChallengeId(challengeToUse._id)
+      }
+
+      if (!challenge || challenge._id !== challengeToUse._id) {
+        setChallenge(challengeToUse)
+        setLanguage(normalizeLanguage(challengeToUse.language))
+        setSourceCode(challengeToUse.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
+        setSubmission(null)
+        setRunError('')
+      }
+
+      console.log('[coding] frontend selectedChallenge state', {
+        selectedChallengeId: challengeToUse._id,
+        challengeId: challengeToUse._id,
+        title: challengeToUse.title,
+      })
+    }
+  }, [challenge, challenges, selectedChallengeId])
 
   useEffect(() => {
     if (editorReady) {
@@ -95,9 +129,14 @@ export default function CodingAssessment() {
 
   const startChallenge = async (challengeId) => {
     setSelectedChallengeId(challengeId)
+    console.log('[coding] frontend startChallenge', { challengeId })
     try {
       const response = await api.get(`/api/coding/challenges/${challengeId}`)
       const selected = response.data.data?.challenge || response.data.challenge
+      console.log('[coding] frontend challenge API response (single)', {
+        challengeId: selected?._id || null,
+        title: selected?.title || null,
+      })
       setChallenge(selected)
       setLanguage(normalizeLanguage(selected?.language))
       setSourceCode(selected?.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
@@ -109,6 +148,12 @@ export default function CodingAssessment() {
   }
 
   const runCode = async () => {
+    console.log('[coding] frontend runCode:start', {
+      selectedChallengeId,
+      challengeId: challenge?._id || null,
+      language,
+      sourceLength: sourceCode.length,
+    })
     if (!challenge) {
       setRunError('Please select a challenge before running your code.')
       return
@@ -128,6 +173,11 @@ export default function CodingAssessment() {
       })
       const payload = response.data.data || response.data
       setSubmission(payload)
+      console.log('[coding] frontend runCode:success', {
+        status: payload.status,
+        score: payload.score,
+        runtimeMs: payload.runtimeMs,
+      })
       const leaderboardResponse = await api.get('/api/coding/leaderboard')
       setLeaderboard(leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || [])
     } catch (error) {
@@ -141,6 +191,15 @@ export default function CodingAssessment() {
 
   const selectedTags = useMemo(() => challenge?.tags || [], [challenge])
   const editorLanguage = useMemo(() => (language === 'c' ? 'cpp' : language), [language])
+  const challengeDescription = useMemo(() => getChallengeDescription(challenge?.prompt), [challenge])
+
+  useEffect(() => {
+    console.log('[coding] frontend selectedChallenge state', {
+      selectedChallengeId,
+      challengeId: challenge?._id || null,
+      challengeTitle: challenge?.title || null,
+    })
+  }, [selectedChallengeId, challenge])
 
   return (
     <div className="space-y-8">
@@ -155,7 +214,10 @@ export default function CodingAssessment() {
 
       <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900">Challenges</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold text-slate-900">Challenges</h3>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{challenges.length} loaded</span>
+          </div>
           <div className="mt-4 space-y-3">
             {loading ? (
               Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20" />)
@@ -185,7 +247,7 @@ export default function CodingAssessment() {
                   <div>
                     <div className="text-sm uppercase tracking-[0.18em] text-slate-500">{challenge.language} · {challenge.difficulty}</div>
                     <h2 className="mt-2 text-2xl font-bold text-slate-900">{challenge.title}</h2>
-                    <p className="mt-3 text-sm text-slate-600 whitespace-pre-wrap">{challenge.prompt}</p>
+                    <p className="mt-3 text-sm text-slate-600 whitespace-pre-wrap">{challengeDescription}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {selectedTags.map((tag) => (
@@ -199,6 +261,58 @@ export default function CodingAssessment() {
                   <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Expected Complexity</div><div className="mt-1 text-lg font-semibold text-slate-900">{challenge.expectedComplexity || 'n/a'}</div></div>
                   <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Sample Input</div><div className="mt-1 text-sm font-mono text-slate-700">{challenge.sampleInput || '-'}</div></div>
                   <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Sample Output</div><div className="mt-1 text-sm font-mono text-slate-700">{challenge.sampleOutput || '-'}</div></div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-sm font-semibold text-slate-900">Examples</div>
+                    <div className="mt-3 space-y-3 text-sm text-slate-700">
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Input</div>
+                        <pre className="mt-1 whitespace-pre-wrap font-mono">{challenge.sampleInput || '-'}</pre>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Expected Output</div>
+                        <pre className="mt-1 whitespace-pre-wrap font-mono">{challenge.sampleOutput || '-'}</pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-sm font-semibold text-slate-900">Constraints</div>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {(challenge.constraints || []).length ? challenge.constraints.map((constraint, index) => (
+                        <li key={`${constraint}-${index}`} className="flex gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                          <span>{constraint}</span>
+                        </li>
+                      )) : <li className="text-slate-500">No constraints provided.</li>}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-900">Public Test Cases</div>
+                    <span className="text-xs uppercase tracking-[0.18em] text-slate-500">{challenge.testCases?.length || 0} cases</span>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {(challenge.testCases || []).length ? challenge.testCases.map((testCase, index) => (
+                      <div key={`${index}-${testCase.input}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                        <div className="font-semibold text-slate-900">Case {index + 1}</div>
+                        <div className="mt-2 grid gap-3 md:grid-cols-2">
+                          <div>
+                            <div className="text-xs uppercase text-slate-500">Input</div>
+                            <pre className="mt-1 whitespace-pre-wrap font-mono">{testCase.input}</pre>
+                          </div>
+                          <div>
+                            <div className="text-xs uppercase text-slate-500">Expected Output</div>
+                            <pre className="mt-1 whitespace-pre-wrap font-mono">{testCase.expectedOutput}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    )) : <div className="text-sm text-slate-500">No public test cases available.</div>}
+                  </div>
                 </div>
               </>
             ) : (
@@ -216,7 +330,10 @@ export default function CodingAssessment() {
                 <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm">
                   {LANGUAGES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
-                <button onClick={runCode} disabled={submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                <button onClick={runCode} disabled={submitting} className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                  {submitting ? 'Running...' : 'Submit Code'}
+                </button>
+                <button onClick={runCode} disabled={submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
                   {submitting ? 'Running...' : 'Run Code'}
                 </button>
               </div>

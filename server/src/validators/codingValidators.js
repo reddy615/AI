@@ -1,4 +1,9 @@
+const mongoose = require('mongoose');
 const { body, query, param } = require('express-validator');
+
+function isCodingChallengeId(value) {
+  return mongoose.isValidObjectId(value) || String(value || '').startsWith('local-coding-');
+}
 
 const listChallengesValidator = [
   query('language').optional().isString().trim(),
@@ -8,7 +13,7 @@ const listChallengesValidator = [
 ];
 
 const runSubmissionValidator = [
-  body('challengeId').isMongoId().withMessage('Valid challenge id required'),
+  body('challengeId').custom(isCodingChallengeId).withMessage('Valid challenge id required'),
   body('language').isString().trim().notEmpty().withMessage('Language required'),
   body('sourceCode').isString().notEmpty().withMessage('Source code is required'),
 ];
@@ -23,7 +28,7 @@ const createChallengeValidator = [
 ];
 
 const getChallengeValidator = [
-  param('id').isMongoId().withMessage('Valid challenge id required'),
+  param('id').custom(isCodingChallengeId).withMessage('Valid challenge id required'),
 ];
 
 module.exports = { listChallengesValidator, runSubmissionValidator, getChallengeValidator, createChallengeValidator };
