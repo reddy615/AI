@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import Editor from '@monaco-editor/react'
+import Editor, { loader } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
+
+// Force Monaco to load from local bundle files instead of external CDN.
+loader.config({ monaco })
 
 const LANGUAGES = [
   { value: 'javascript', label: 'JavaScript' },
@@ -20,6 +24,8 @@ export default function CodingAssessment() {
   const [loading, setLoading] = useState(true)
   const [submission, setSubmission] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
+  const [editorReady, setEditorReady] = useState(false)
+  const [editorTimedOut, setEditorTimedOut] = useState(false)
 
   const loadChallenges = async () => {
     setLoading(true)
@@ -37,7 +43,7 @@ export default function CodingAssessment() {
       if (!selectedChallengeId && challengeList.length) {
         setSelectedChallengeId(challengeList[0]._id)
         setChallenge(challengeList[0])
-        setSourceCode(challengeList[0].starterCode)
+        setSourceCode(challengeList[0].starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       }
     } catch (error) {
       console.error(error)
@@ -55,10 +61,25 @@ export default function CodingAssessment() {
     const selected = challenges.find((item) => item._id === selectedChallengeId)
     if (selected) {
       setChallenge(selected)
-      setSourceCode(selected.starterCode)
+      setSourceCode(selected.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       setSubmission(null)
     }
   }, [selectedChallengeId, challenges])
+
+  useEffect(() => {
+    if (editorReady) {
+      setEditorTimedOut(false)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setEditorTimedOut(true)
+    }, 8000)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [editorReady])
 
   const startChallenge = async (challengeId) => {
     setSelectedChallengeId(challengeId)
@@ -66,7 +87,7 @@ export default function CodingAssessment() {
       const response = await api.get(`/api/coding/challenges/${challengeId}`)
       const selected = response.data.data?.challenge || response.data.challenge
       setChallenge(selected)
-      setSourceCode(selected.starterCode)
+      setSourceCode(selected?.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       setSubmission(null)
     } catch (error) {
       console.error(error)
@@ -169,19 +190,35 @@ export default function CodingAssessment() {
                 <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm">
                   {LANGUAGES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
-                <button onClick={runCode} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                <button onClick={runCode} disabled={!challenge || submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
                   {submitting ? 'Running...' : 'Run Code'}
                 </button>
               </div>
             </div>
             <div className="h-[32rem]">
-              <Editor
-                language={language}
-                value={sourceCode}
-                onChange={(value) => setSourceCode(value || '')}
-                theme="vs-dark"
-                options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', automaticLayout: true }}
-              />
+              {editorTimedOut && !editorReady ? (
+                <div className="h-full p-4">
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    The Monaco editor is taking too long to load. You can still type your code below.
+                  </div>
+                  <textarea
+                    value={sourceCode}
+                    onChange={(event) => setSourceCode(event.target.value)}
+                    className="h-[27rem] w-full resize-none rounded-xl border border-slate-300 p-4 font-mono text-sm text-slate-900 outline-none focus:border-slate-500"
+                    spellCheck={false}
+                  />
+                </div>
+              ) : (
+                <Editor
+                  language={language}
+                  value={sourceCode}
+                  onMount={() => setEditorReady(true)}
+                  onChange={(value) => setSourceCode(value || '')}
+                  loading={<div className="flex h-full items-center justify-center text-slate-500">Loading editor...</div>}
+                  theme="vs-dark"
+                  options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', automaticLayout: true }}
+                />
+              )}
             </div>
           </div>
 
