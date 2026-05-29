@@ -11,8 +11,16 @@ const LANGUAGES = [
   { value: 'javascript', label: 'JavaScript' },
   { value: 'python', label: 'Python' },
   { value: 'java', label: 'Java' },
+  { value: 'c', label: 'C' },
   { value: 'cpp', label: 'C++' },
 ]
+
+function normalizeLanguage(value) {
+  const language = String(value || '').toLowerCase().trim()
+  if (!language) return 'javascript'
+  if (language === 'c++') return 'cpp'
+  return LANGUAGES.some((item) => item.value === language) ? language : 'javascript'
+}
 
 export default function CodingAssessment() {
   const [challenges, setChallenges] = useState([])
@@ -26,6 +34,7 @@ export default function CodingAssessment() {
   const [leaderboard, setLeaderboard] = useState([])
   const [editorReady, setEditorReady] = useState(false)
   const [editorTimedOut, setEditorTimedOut] = useState(false)
+  const [runError, setRunError] = useState('')
 
   const loadChallenges = async () => {
     setLoading(true)
@@ -43,6 +52,7 @@ export default function CodingAssessment() {
       if (!selectedChallengeId && challengeList.length) {
         setSelectedChallengeId(challengeList[0]._id)
         setChallenge(challengeList[0])
+        setLanguage(normalizeLanguage(challengeList[0].language))
         setSourceCode(challengeList[0].starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       }
     } catch (error) {
@@ -61,8 +71,10 @@ export default function CodingAssessment() {
     const selected = challenges.find((item) => item._id === selectedChallengeId)
     if (selected) {
       setChallenge(selected)
+      setLanguage(normalizeLanguage(selected.language))
       setSourceCode(selected.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       setSubmission(null)
+      setRunError('')
     }
   }, [selectedChallengeId, challenges])
 
@@ -87,15 +99,26 @@ export default function CodingAssessment() {
       const response = await api.get(`/api/coding/challenges/${challengeId}`)
       const selected = response.data.data?.challenge || response.data.challenge
       setChallenge(selected)
+      setLanguage(normalizeLanguage(selected?.language))
       setSourceCode(selected?.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
       setSubmission(null)
+      setRunError('')
     } catch (error) {
       console.error(error)
     }
   }
 
   const runCode = async () => {
-    if (!challenge) return
+    if (!challenge) {
+      setRunError('Please select a challenge before running your code.')
+      return
+    }
+    if (!sourceCode.trim()) {
+      setRunError('Source code cannot be empty.')
+      return
+    }
+
+    setRunError('')
     setSubmitting(true)
     try {
       const response = await api.post('/api/coding/run', {
@@ -109,12 +132,15 @@ export default function CodingAssessment() {
       setLeaderboard(leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || [])
     } catch (error) {
       console.error(error)
+      const message = error.response?.data?.message || error.response?.data?.error || error.message || 'Unable to run code right now.'
+      setRunError(message)
     } finally {
       setSubmitting(false)
     }
   }
 
   const selectedTags = useMemo(() => challenge?.tags || [], [challenge])
+  const editorLanguage = useMemo(() => (language === 'c' ? 'cpp' : language), [language])
 
   return (
     <div className="space-y-8">
@@ -190,11 +216,16 @@ export default function CodingAssessment() {
                 <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm">
                   {LANGUAGES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
-                <button onClick={runCode} disabled={!challenge || submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                <button onClick={runCode} disabled={submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
                   {submitting ? 'Running...' : 'Run Code'}
                 </button>
               </div>
             </div>
+            {runError ? (
+              <div className="border-b border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-700">
+                {runError}
+              </div>
+            ) : null}
             <div className="h-[32rem]">
               {editorTimedOut && !editorReady ? (
                 <div className="h-full p-4">
@@ -210,7 +241,7 @@ export default function CodingAssessment() {
                 </div>
               ) : (
                 <Editor
-                  language={language}
+                  language={editorLanguage}
                   value={sourceCode}
                   onMount={() => setEditorReady(true)}
                   onChange={(value) => setSourceCode(value || '')}
