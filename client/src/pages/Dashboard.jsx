@@ -142,6 +142,10 @@ export default function Dashboard() {
 
       const resumeData = extractResumeData(response)
       const uploadedResume = resumeData?.resumeUrl || resumeData?.resume || ''
+      if (!uploadedResume) {
+        throw new Error('Resume upload response did not include a resume URL')
+      }
+
       const nextUser = {
         ...(user || {}),
         resume: resumeData?.resume || uploadedResume,
@@ -161,7 +165,7 @@ export default function Dashboard() {
       setResumeFile(null)
       event.target.reset()
     } catch (error) {
-      setResumeError(error.response?.data?.message || 'Resume upload failed.')
+      setResumeError(error.response?.data?.message || error.message || 'Resume upload failed.')
     } finally {
       setResumeUploading(false)
     }
