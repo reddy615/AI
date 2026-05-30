@@ -36,9 +36,40 @@ function updateLocalUser(id, updates) {
   return user
 }
 
+function upsertLocalUser(user) {
+  if (!user) return null
+
+  const normalizedUser = {
+    id: user.id || user.email,
+    name: user.name,
+    email: user.email,
+    password: user.password,
+    role: user.role || 'user',
+    preferredLanguage: user.preferredLanguage || 'en',
+    isActive: user.isActive !== false,
+    refreshTokenVersion: typeof user.refreshTokenVersion === 'number' ? user.refreshTokenVersion : 0,
+  }
+
+  const existingIndex = LOCAL_USERS.findIndex(
+    (item) => item.id === normalizedUser.id || item.email.toLowerCase() === String(normalizedUser.email || '').toLowerCase()
+  )
+
+  if (existingIndex >= 0) {
+    LOCAL_USERS[existingIndex] = {
+      ...LOCAL_USERS[existingIndex],
+      ...normalizedUser,
+    }
+    return LOCAL_USERS[existingIndex]
+  }
+
+  LOCAL_USERS.push(normalizedUser)
+  return normalizedUser
+}
+
 module.exports = {
   LOCAL_USERS,
   findLocalUserByEmail,
   findLocalUserById,
   updateLocalUser,
+  upsertLocalUser,
 }

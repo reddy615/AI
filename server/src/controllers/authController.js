@@ -6,17 +6,24 @@ const { sendError } = require('../utils/apiResponse');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { serializeUserProfile } = require('../utils/userProfile');
 const { ensureAuthUsersSeeded } = require('../seed/ensureAuthUsersSeeded');
+const {
+  findLocalUserByEmail,
+  findLocalUserById,
+  updateLocalUser,
+  upsertLocalUser,
+} = require('../config/localUsers');
 
 function isDatabaseReady() {
   return mongoose.connection.readyState === 1;
 }
 
 function buildTokenPayload(user) {
-  if (!user?._id) {
-    throw new Error('MongoDB user id is required to issue tokens');
+  const userId = user?._id || user?.id || user?.email;
+  if (!userId) {
+    throw new Error('User id is required to issue tokens');
   }
 
-  return { id: String(user._id), role: user.role, ver: user.refreshTokenVersion };
+  return { id: String(userId), role: user.role, ver: user.refreshTokenVersion };
 }
 
 function setRefreshCookie(res, token) {
@@ -58,15 +65,32 @@ function attachAuthPayload(res, user, tokens, message) {
 
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
-  if (!isDatabaseReady()) {
-    return sendError(res, 'Database unavailable. Please try again.', 503);
-  }
-
-  const existing = await User.findOne({ email });
-  if (existing) return sendError(res, 'Email already in use', 400);
   const salt = await bcrypt.genSalt(10);
   const hash = await bcrypt.hash(password, salt);
-  const user = await User.create({ name, email, password: hash });
+
+  if (isDatabaseReady()) {
+    const existing = await User.findOne({ email });
+    if (existing) return sendError(res, 'Email already in use', 400);
+
+    const user = await User.create({ name, email, password: hash });
+    const tokens = issueTokens(user);
+    setRefreshCookie(res, tokens.refreshToken);
+    return attachAuthPayload(res, user, tokens, 'Registered successfully');
+  }
+
+  const localExisting = findLocalUserByEmail(email);
+  if (localExisting) return sendError(res, 'Email already in use', 400);
+
+  const user = upsertLocalUser({
+    id: email,
+    name,
+    email,
+    password: hash,
+    role: 'user',
+    preferredLanguage: 'en',
+    isActive: true,
+    refreshTokenVersion: 0,
+  });
   const tokens = issueTokens(user);
   setRefreshCookie(res, tokens.refreshToken);
   return attachAuthPayload(res, user, tokens, 'Registered successfully');
@@ -74,14 +98,18 @@ exports.register = asyncHandler(async (req, res) => {
 
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  if (!isDatabaseReady()) {
-    return sendError(res, 'Database unavailable. Please try again.', 503);
+  let user = null;
+
+  if (isDatabaseReady()) {
+    user = await User.findOne({ email });
+    if (!user) {
+      await ensureAuthUsersSeeded();
+      user = await User.findOne({ email });
+    }
   }
 
-  let user = await User.findOne({ email });
   if (!user) {
-    await ensureAuthUsersSeeded();
-    user = await User.findOne({ email });
+    user = findLocalUserByEmail(email);
   }
 
   if (!user || !user.isActive || typeof user.password !== 'string' || !user.password) {
@@ -91,6 +119,17 @@ exports.login = asyncHandler(async (req, res) => {
   const match = await bcrypt.compare(password, user.password);
   if (!match) return sendError(res, 'Invalid credentials', 400);
 
+  if (!isDatabaseReady() && user.id) {
+    updateLocalUser(user.id, {
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      role: user.role,
+      preferredLanguage: user.preferredLanguage,
+      isActive: true,
+    });
+  }
+
   const tokens = issueTokens(user);
   setRefreshCookie(res, tokens.refreshToken);
   return attachAuthPayload(res, user, tokens, 'Login successful');
@@ -98,7 +137,12 @@ exports.login = asyncHandler(async (req, res) => {
 
 exports.me = asyncHandler(async (req, res) => {
   if (!isDatabaseReady()) {
-    return sendError(res, 'Database unavailable. Please try again.', 503);
+    const localUser = findLocalUserById(req.user.id) || findLocalUserByEmail(req.user.email);
+    if (!localUser) {
+      return sendError(res, 'User not found', 404);
+    }
+
+    return res.apiSuccess(serializeUserProfile(localUser), 'Profile loaded');
   }
 
   const user = await User.findById(req.user.id).select('-password');
@@ -110,10 +154,6 @@ exports.me = asyncHandler(async (req, res) => {
 });
 
 exports.refresh = asyncHandler(async (req, res) => {
-  if (!isDatabaseReady()) {
-    return sendError(res, 'Database unavailable. Please try again.', 503);
-  }
-
   const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
   if (!incoming) return sendError(res, 'Refresh token required', 401);
 
@@ -124,7 +164,13 @@ exports.refresh = asyncHandler(async (req, res) => {
     return sendError(res, 'Refresh token invalid or expired', 401);
   }
 
-  const user = await User.findById(decoded.id);
+  let user = null;
+  if (isDatabaseReady()) {
+    user = await User.findById(decoded.id);
+  } else {
+    user = findLocalUserById(decoded.id);
+  }
+
   if (!user || !user.isActive) {
     return sendError(res, 'Unauthorized', 401);
   }
@@ -139,25 +185,23 @@ exports.refresh = asyncHandler(async (req, res) => {
 });
 
 exports.logout = asyncHandler(async (req, res) => {
-  if (!isDatabaseReady()) {
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
-      sameSite: (process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production') ? 'none' : 'lax',
-      domain: process.env.COOKIE_DOMAIN || undefined,
-    });
-
-    return sendError(res, 'Database unavailable. Please try again.', 503);
-  }
-
   const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
   if (incoming) {
     try {
       const decoded = verifyRefreshToken(incoming);
-      const user = await User.findById(decoded.id);
-      if (user) {
-        user.refreshTokenVersion += 1;
-        await user.save();
+      if (isDatabaseReady()) {
+        const user = await User.findById(decoded.id);
+        if (user) {
+          user.refreshTokenVersion += 1;
+          await user.save();
+        }
+      } else {
+        const localUser = findLocalUserById(decoded.id);
+        if (localUser) {
+          updateLocalUser(localUser.id, {
+            refreshTokenVersion: (localUser.refreshTokenVersion || 0) + 1,
+          });
+        }
       }
     } catch (error) {
       // ignore invalid refresh token during logout
