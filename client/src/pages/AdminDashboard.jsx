@@ -16,7 +16,7 @@ export default function AdminDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const [summaryResponse, usersResponse, questionsResponse, interviewsResponse, reportsResponse] = await Promise.all([
+      const [summaryResponse, usersResponse, questionsResponse, interviewsResponse, reportsResponse] = await Promise.allSettled([
         api.get('/api/admin/summary'),
         api.get('/api/admin/users?limit=10'),
         api.get('/api/admin/questions?limit=10'),
@@ -25,13 +25,18 @@ export default function AdminDashboard() {
       ])
 
       setData({
-        summary: summaryResponse.data.data?.summary || summaryResponse.data.summary,
-        leaderboard: summaryResponse.data.data?.leaderboard || [],
-        users: usersResponse.data.data?.users || usersResponse.data.users || [],
-        questions: questionsResponse.data.data?.questions || questionsResponse.data.questions || [],
-        interviews: interviewsResponse.data.data?.sessions || interviewsResponse.data.sessions || [],
-        reports: reportsResponse.data.data?.reports || reportsResponse.data.reports,
+        summary: summaryResponse.status === 'fulfilled' ? (summaryResponse.value.data.data?.summary || summaryResponse.value.data.summary || null) : null,
+        leaderboard: summaryResponse.status === 'fulfilled' ? (summaryResponse.value.data.data?.leaderboard || summaryResponse.value.data.leaderboard || []) : [],
+        users: usersResponse.status === 'fulfilled' ? (usersResponse.value.data.data?.users || usersResponse.value.data.users || []) : [],
+        questions: questionsResponse.status === 'fulfilled' ? (questionsResponse.value.data.data?.questions || questionsResponse.value.data.questions || []) : [],
+        interviews: interviewsResponse.status === 'fulfilled' ? (interviewsResponse.value.data.data?.sessions || interviewsResponse.value.data.sessions || []) : [],
+        reports: reportsResponse.status === 'fulfilled' ? (reportsResponse.value.data.data?.reports || reportsResponse.value.data.reports || null) : null,
       })
+
+      const failures = [summaryResponse, usersResponse, questionsResponse, interviewsResponse, reportsResponse].filter((item) => item.status === 'rejected')
+      if (failures.length === 5) {
+        setError('No admin data could be loaded.')
+      }
     } catch (requestError) {
       console.error(requestError)
       setError(requestError.response?.data?.message || 'Unable to load admin data')
@@ -70,12 +75,16 @@ export default function AdminDashboard() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {loading
           ? Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-28" />)
-          : metrics.map((metric) => (
+          : metrics.length ? metrics.map((metric) => (
               <div key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-sm uppercase tracking-[0.18em] text-slate-500">{metric.label}</div>
                 <div className="mt-2 text-3xl font-bold text-slate-900">{metric.value}</div>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 xl:col-span-3">
+                No analytics available.
+              </div>
+            )}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -97,15 +106,25 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ))
-            ) : null}
+            ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  No leaderboard data yet.
+                </div>
+            )}
           </div>
         </div>
 
         <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Platform Reports</h2>
-          <pre className="mt-4 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-            {JSON.stringify(data.reports, null, 2)}
-          </pre>
+            {data.reports ? (
+              <pre className="mt-4 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
+                {JSON.stringify(data.reports, null, 2)}
+              </pre>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                No analytics available.
+              </div>
+            )}
         </div>
       </section>
     </div>
@@ -155,7 +174,13 @@ export default function AdminDashboard() {
                   </div>
                 </td>
               </tr>
-            )) : null}
+            )) : (
+              <tr>
+                <td className="px-4 py-6 text-sm text-slate-500" colSpan="5">
+                  No users found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -172,7 +197,11 @@ export default function AdminDashboard() {
           <h3 className="mt-2 font-semibold text-slate-900">{question.title || question.question || question.text}</h3>
           <p className="mt-2 text-sm text-slate-600">{question.prompt || question.explanation || 'Managed content item'}</p>
         </article>
-      )) : null}
+      )) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 lg:col-span-2">
+          No questions found.
+        </div>
+      )}
     </div>
   )
 
@@ -190,7 +219,11 @@ export default function AdminDashboard() {
             <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">{session.durationSeconds || 0}s</span>
           </div>
         </div>
-      )) : null}
+      )) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+          No interview reports yet.
+        </div>
+      )}
     </div>
   )
 

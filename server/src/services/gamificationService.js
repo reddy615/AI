@@ -2,6 +2,8 @@ const User = require('../models/User');
 const UserProgress = require('../models/UserProgress');
 const { getRedisClient } = require('../config/redis');
 
+const ADMIN_DEBUG_LOGS = process.env.ADMIN_DEBUG_LOGS === 'true';
+
 const BADGES = [
   { key: 'first-quiz', title: 'First Quiz', description: 'Completed your first quiz attempt.' },
   { key: 'streak-3', title: 'Three-Day Streak', description: 'Learned three days in a row.' },
@@ -150,37 +152,65 @@ async function getLeaderboard(limit = 10) {
   const redis = getRedisClient();
   const cacheKey = `gamification:leaderboard:${safeLimit}`;
 
+  if (ADMIN_DEBUG_LOGS) {
+    console.info('[gamification:getLeaderboard:start]', {
+      mongoState: require('mongoose').connection.readyState,
+      limit: safeLimit,
+    });
+  }
+
   if (redis) {
     const cached = await redis.get(cacheKey);
     if (cached) {
+      if (ADMIN_DEBUG_LOGS) {
+        console.info('[gamification:getLeaderboard:cache-hit]', { limit: safeLimit, count: JSON.parse(cached).length });
+      }
       return JSON.parse(cached);
     }
   }
 
-  const progress = await UserProgress.find({})
-    .sort({ xp: -1, longestStreak: -1, updatedAt: -1 })
-    .limit(safeLimit)
-    .populate('user', 'name email role preferredLanguage')
-    .lean();
+  try {
+    const progress = await UserProgress.find({})
+      .sort({ xp: -1, longestStreak: -1, updatedAt: -1 })
+      .limit(safeLimit)
+      .populate('user', 'name email role preferredLanguage')
+      .lean();
 
-  const leaderboard = progress.map((item, index) => ({
-    rank: index + 1,
-    userId: String(item.user?._id || item.user),
-    name: item.user?.name || 'Learner',
-    email: item.user?.email || '',
-    role: item.user?.role || 'user',
-    preferredLanguage: item.user?.preferredLanguage || item.preferredLanguage || 'en',
-    xp: item.xp || 0,
-    level: item.level || getLevelFromXp(item.xp || 0),
-    streak: item.streak || 0,
-    badges: item.badges || [],
-  }));
+    const leaderboard = progress.map((item, index) => ({
+      rank: index + 1,
+      userId: String(item.user?._id || item.user),
+      name: item.user?.name || 'Learner',
+      email: item.user?.email || '',
+      role: item.user?.role || 'user',
+      preferredLanguage: item.user?.preferredLanguage || item.preferredLanguage || 'en',
+      xp: item.xp || 0,
+      level: item.level || getLevelFromXp(item.xp || 0),
+      streak: item.streak || 0,
+      badges: item.badges || [],
+    }));
 
-  if (redis) {
-    await redis.set(cacheKey, JSON.stringify(leaderboard), 'EX', Number(process.env.LEADERBOARD_CACHE_TTL_SECONDS || 300));
+    if (ADMIN_DEBUG_LOGS) {
+      console.info('[gamification:getLeaderboard:success]', {
+        count: leaderboard.length,
+        sample: leaderboard[0] || null,
+      });
+    }
+
+    if (redis) {
+      await redis.set(cacheKey, JSON.stringify(leaderboard), 'EX', Number(process.env.LEADERBOARD_CACHE_TTL_SECONDS || 300));
+    }
+
+    return leaderboard;
+  } catch (error) {
+    if (ADMIN_DEBUG_LOGS) {
+      console.info('[gamification:getLeaderboard:error]', {
+        name: error.name,
+        message: error.message,
+      });
+    }
+
+    return [];
   }
-
-  return leaderboard;
 }
 
 async function getProgress(userId) {
