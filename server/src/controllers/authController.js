@@ -4,6 +4,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { findLocalUserByEmail, findLocalUserById } = require('../config/localUsers');
+const { serializeUserProfile } = require('../utils/userProfile');
 
 function buildTokenPayload(user) {
   return { id: String(user._id || user.id || user.email), role: user.role, ver: user.refreshTokenVersion };
@@ -39,14 +40,7 @@ function attachAuthPayload(res, user, tokens, message) {
       token: tokens.accessToken,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: String(user._id || user.id || user.email),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        preferredLanguage: user.preferredLanguage || 'en',
-        resume: user.resume,
-      },
+      user: serializeUserProfile(user),
     },
     message,
     200
@@ -105,18 +99,7 @@ exports.me = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (user) {
-      return res.apiSuccess(
-        {
-          id: String(user._id),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          preferredLanguage: user.preferredLanguage || 'en',
-          resume: user.resume,
-          isActive: user.isActive,
-        },
-        'Profile loaded'
-      );
+      return res.apiSuccess(serializeUserProfile(user), 'Profile loaded');
     }
   } catch (error) {
     // Fall back to local user storage below.
@@ -124,18 +107,7 @@ exports.me = asyncHandler(async (req, res) => {
 
   const localUser = findLocalUserById(req.user.id);
   if (!localUser) return sendError(res, 'User not found', 404);
-  return res.apiSuccess(
-    {
-      id: String(localUser.id),
-      name: localUser.name,
-      email: localUser.email,
-      role: localUser.role,
-      preferredLanguage: localUser.preferredLanguage || 'en',
-      resume: localUser.resume,
-      isActive: localUser.isActive,
-    },
-    'Profile loaded'
-  );
+  return res.apiSuccess(serializeUserProfile(localUser), 'Profile loaded');
 });
 
 exports.refresh = asyncHandler(async (req, res) => {

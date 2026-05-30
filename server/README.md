@@ -28,6 +28,11 @@ Stage 4 scaling settings:
 - `COOKIE_SECURE`, `COOKIE_DOMAIN`
 - `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_MAX`
 
+Resume storage settings:
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
 New stage 4 routes:
 - `GET /health` and `GET /ready`
 - `GET /api/recommendations/personalized`
@@ -99,6 +104,7 @@ API endpoints:
 - `POST /api/auth/logout` — revoke refresh token version
 - `GET /api/auth/me` — get profile (requires `Authorization: Bearer <token>`)
 - `POST /api/profile/resume` — upload resume (form field `resume`)
+- `DELETE /api/profile/resume` — remove uploaded resume
 - `GET /api/quiz/start` — fetch randomized quiz questions
 - `POST /api/quiz/submit` — submit answers
 - `GET /api/quiz/history` — list attempts

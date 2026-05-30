@@ -7,6 +7,9 @@ ML_SERVICE_URL=https://<ml-service>.up.railway.app
 JWT_SECRET=replace-with-strong-secret
 ACCESS_TOKEN_SECRET=replace-with-strong-secret
 REFRESH_TOKEN_SECRET=replace-with-strong-secret
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
 
 CORS_ORIGIN=https://<client>.up.railway.app,https://your-domain.com
 COOKIE_SECURE=true

@@ -2,17 +2,9 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const auth = require('../middleware/auth');
-const { uploadResume, getProfile, updatePreferences } = require('../controllers/profileController');
+const { uploadResume, getProfile, updatePreferences, deleteResume } = require('../controllers/profileController');
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    const ext = file.originalname.split('.').pop();
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
-  }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -29,5 +21,6 @@ const upload = multer({
 router.get('/', auth, getProfile);
 router.put('/preferences', auth, updatePreferences);
 router.post('/resume', auth, upload.single('resume'), uploadResume);
+router.delete('/resume', auth, deleteResume);
 
 module.exports = router;

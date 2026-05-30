@@ -23,9 +23,6 @@ const recommendationRoutes = require('./routes/recommendations');
 const gamificationRoutes = require('./routes/gamification');
 const adminRoutes = require('./routes/admin');
 
-const uploadsDir = path.join(__dirname, '../uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
-
 client.collectDefaultMetrics({ prefix: 'ai_interview_' });
 const httpRequestDuration = new client.Histogram({
 	name: 'http_request_duration_seconds',
@@ -55,7 +52,6 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(mongoSanitize());
 app.use(xssClean());
-app.use('/uploads', express.static('uploads'));
 
 app.use((req, res, next) => {
 	const end = httpRequestDuration.startTimer();
@@ -121,7 +117,7 @@ try {
 	// SPA fallback: serve index.html for non-API GET requests
 	app.get('*', (req, res, next) => {
 		if (req.method !== 'GET') return next();
-		if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+		if (req.path.startsWith('/api')) return next();
 		const indexHtml = path.join(clientDistPath, 'index.html');
 		return res.sendFile(indexHtml, (err) => {
 			if (err) return next();

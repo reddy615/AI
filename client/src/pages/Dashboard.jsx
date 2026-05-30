@@ -26,6 +26,9 @@ export default function Dashboard() {
   const [resumeError, setResumeError] = useState('')
   const navigate = useNavigate()
 
+  const resumeUrl = user?.resumeUrl || user?.resume || ''
+  const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
+
   const loadDashboard = async () => {
     setLoading(true)
     try {
@@ -118,7 +121,14 @@ export default function Dashboard() {
       })
 
       const uploadedResume = response.data?.data?.resume || response.data?.resume
-      setUser((current) => ({ ...(current || {}), resume: uploadedResume }))
+      setUser((current) => ({
+        ...(current || {}),
+        resume: response.data?.data?.resume || uploadedResume,
+        resumeUrl: response.data?.data?.resumeUrl || uploadedResume,
+        resumeFileName: response.data?.data?.resumeFileName || resumeFile?.name || getResumeName(uploadedResume),
+        resumePublicId: response.data?.data?.resumePublicId || current?.resumePublicId || null,
+        resumeResourceType: response.data?.data?.resumeResourceType || current?.resumeResourceType || null,
+      }))
       setResumeMessage('Resume uploaded successfully.')
       setResumeFile(null)
       event.target.reset()
@@ -126,6 +136,26 @@ export default function Dashboard() {
       setResumeError(error.response?.data?.message || 'Resume upload failed.')
     } finally {
       setResumeUploading(false)
+    }
+  }
+
+  const removeResume = async () => {
+    setResumeError('')
+    setResumeMessage('')
+
+    try {
+      await api.delete('/api/profile/resume')
+      setUser((current) => ({
+        ...(current || {}),
+        resume: null,
+        resumeUrl: null,
+        resumeFileName: null,
+        resumePublicId: null,
+        resumeResourceType: null,
+      }))
+      setResumeMessage('Resume removed successfully.')
+    } catch (error) {
+      setResumeError(error.response?.data?.message || 'Resume removal failed.')
     }
   }
 
@@ -221,18 +251,27 @@ export default function Dashboard() {
                   <p><span className="font-semibold text-slate-900">Name:</span> {user?.name}</p>
                   <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
                   <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
-                  <p><span className="font-semibold text-slate-900">Resume:</span> {user?.resume ? 'Uploaded' : 'Not uploaded'}</p>
-                  {user?.resume ? (
+                  <p><span className="font-semibold text-slate-900">Resume:</span> {resumeUrl ? 'Uploaded' : 'Not uploaded'}</p>
+                  {resumeUrl ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saved File</div>
-                      <a
-                        href={user.resume}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex break-all text-sm font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        {getResumeName(user.resume) || 'Open uploaded resume'}
-                      </a>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <a
+                          href={resumeUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex break-all text-sm font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          {resumeFileName || 'Open uploaded resume'}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={removeResume}
+                          className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
