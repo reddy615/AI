@@ -1,28 +1,5 @@
 const Attempt = require('../models/Attempt');
 const CodingAttempt = require('../models/CodingAttempt');
-const { findLocalUserById } = require('../config/localUsers');
-const { localQuizAttemptStore } = require('../config/localQuizStore');
-
-function buildEmptyAnalytics(userId) {
-  const localUser = findLocalUserById(userId);
-  return {
-    userId,
-    quizAttempts: [],
-    quizScores: [],
-    moduleBreakdown: {},
-    codingHistory: [],
-    codingLeaderboard: [],
-    weakAreas: [],
-    summary: {
-      totalQuizAttempts: 0,
-      totalCodingAttempts: 0,
-      averageAccuracy: 0,
-      bestQuizScore: 0,
-      bestCodingScore: 0,
-    },
-    source: localUser ? 'local-fallback' : 'empty-fallback',
-  };
-}
 
 function calculateWeakAreas(attempts) {
   const stats = new Map();
@@ -53,23 +30,12 @@ function calculateWeakAreas(attempts) {
 }
 
 async function getUserAnalytics(userId) {
-  const localQuizAttempts = Array.from(localQuizAttemptStore.values()).filter((attempt) => String(attempt.user) === String(userId));
+  const [dbQuizAttempts, codingAttempts] = await Promise.all([
+    Attempt.find({ user: userId }).sort({ createdAt: 1 }).populate('answers.questionId').lean(),
+    CodingAttempt.find({ user: userId }).populate('challenge').sort({ createdAt: -1 }).lean(),
+  ]);
 
-  let dbQuizAttempts = [];
-  try {
-    dbQuizAttempts = await Attempt.find({ user: userId }).sort({ createdAt: 1 }).populate('answers.questionId').lean();
-  } catch (error) {
-    dbQuizAttempts = [];
-  }
-
-  let codingAttempts = [];
-  try {
-    codingAttempts = await CodingAttempt.find({ user: userId }).populate('challenge').sort({ createdAt: -1 }).lean();
-  } catch (error) {
-    codingAttempts = [];
-  }
-
-  const quizAttempts = [...dbQuizAttempts, ...localQuizAttempts].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const quizAttempts = dbQuizAttempts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   const quizScores = quizAttempts.map((attempt) => ({
     date: attempt.createdAt,

@@ -1,55 +1,25 @@
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
-const { findLocalUserById, updateLocalUser } = require('../config/localUsers');
 const { uploadBuffer, deleteAsset, hasCloudinaryConfig } = require('../config/cloudinary');
 const { serializeUserProfile } = require('../utils/userProfile');
 
 async function findDatabaseUser(req, { includePassword = false } = {}) {
-  try {
-    const byIdQuery = User.findById(req.user.id);
-    if (!includePassword) {
-      byIdQuery.select('-password');
-    }
-
-    const byId = await byIdQuery;
-    if (byId) {
-      return byId;
-    }
-  } catch (error) {
-    // Fall back to lookup by email when the token id belongs to a local account.
+  const query = User.findById(req.user.id);
+  if (!includePassword) {
+    query.select('-password');
   }
 
-  if (req.user?.email) {
-    const byEmailQuery = User.findOne({ email: req.user.email });
-    if (!includePassword) {
-      byEmailQuery.select('-password');
-    }
-
-    return byEmailQuery;
-  }
-
-  return null;
+  return query;
 }
 
 exports.getProfile = asyncHandler(async (req, res) => {
-  try {
-    const user = await findDatabaseUser(req);
-    if (user) {
-      return res.apiSuccess({ user: serializeUserProfile(user) }, 'Profile loaded');
-    }
-  } catch (error) {
-    // Fall back to local users.
+  const user = await findDatabaseUser(req);
+  if (!user) {
+    return sendError(res, 'User not found', 404);
   }
 
-  const localUser = findLocalUserById(req.user.id);
-  if (!localUser) return sendError(res, 'User not found', 404);
-  return res.apiSuccess(
-    {
-      user: serializeUserProfile(localUser),
-    },
-    'Profile loaded'
-  );
+  return res.apiSuccess({ user: serializeUserProfile(user) }, 'Profile loaded');
 });
 
 exports.updatePreferences = asyncHandler(async (req, res) => {
@@ -60,43 +30,26 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
     return sendError(res, 'Unsupported language', 400);
   }
 
-  try {
-    const user = await findDatabaseUser(req, { includePassword: true });
-    if (user) {
-      if (preferredLanguage) {
-        user.preferredLanguage = preferredLanguage;
-        await user.save();
-      }
-
-      return res.apiSuccess({ preferredLanguage: user.preferredLanguage || 'en' }, 'Preferences updated');
-    }
-  } catch (error) {
-    // Fall back to local users.
+  const user = await findDatabaseUser(req, { includePassword: true });
+  if (!user) {
+    return sendError(res, 'User not found', 404);
   }
 
-  const localUser = updateLocalUser(req.user.id, preferredLanguage ? { preferredLanguage } : {});
-  if (!localUser) return sendError(res, 'User not found', 404);
+  if (preferredLanguage) {
+    user.preferredLanguage = preferredLanguage;
+    await user.save();
+  }
 
-  return res.apiSuccess({ preferredLanguage: localUser.preferredLanguage || 'en' }, 'Preferences updated');
+  return res.apiSuccess({ preferredLanguage: user.preferredLanguage || 'en' }, 'Preferences updated');
 });
 
 exports.uploadResume = asyncHandler(async (req, res) => {
   if (!req.file) return sendError(res, 'No file uploaded', 400);
 
   let user;
-  try {
-    user = await findDatabaseUser(req, { includePassword: true });
-  } catch (error) {
-    console.error('[profile:resume] unable to resolve database user', {
-      userId: req.user?.id,
-      email: req.user?.email,
-      error: error.message,
-    });
-    return sendError(res, 'Unable to resolve your profile for resume upload', 500);
-  }
-
+  user = await findDatabaseUser(req, { includePassword: true });
   if (!user) {
-    return sendError(res, 'Persistent profile not found. Please log in with your registered account.', 404);
+    return sendError(res, 'User not found', 404);
   }
 
   if (!hasCloudinaryConfig()) {
@@ -141,15 +94,7 @@ exports.uploadResume = asyncHandler(async (req, res) => {
   user.resumeResourceType = uploadResult.resource_type || 'raw';
   user.resumeFileName = originalName;
 
-  try {
-    await user.save();
-  } catch (error) {
-    console.error('[profile:resume] failed to save resume metadata', {
-      userId: String(user._id || user.id),
-      error: error.message,
-    });
-    return sendError(res, 'Failed to save resume metadata', 500);
-  }
+  await user.save();
 
   return res.apiSuccess(
     {
@@ -164,20 +109,9 @@ exports.uploadResume = asyncHandler(async (req, res) => {
 });
 
 exports.deleteResume = asyncHandler(async (req, res) => {
-  let user;
-  try {
-    user = await findDatabaseUser(req, { includePassword: true });
-  } catch (error) {
-    console.error('[profile:resume] unable to resolve database user for delete', {
-      userId: req.user?.id,
-      email: req.user?.email,
-      error: error.message,
-    });
-    return sendError(res, 'Unable to resolve your profile for resume removal', 500);
-  }
-
+  const user = await findDatabaseUser(req, { includePassword: true });
   if (!user) {
-    return sendError(res, 'Persistent profile not found. Please log in with your registered account.', 404);
+    return sendError(res, 'User not found', 404);
   }
 
   if (user.resumePublicId) {
@@ -193,16 +127,7 @@ exports.deleteResume = asyncHandler(async (req, res) => {
   user.resumePublicId = null;
   user.resumeFileName = null;
   user.resumeResourceType = null;
-
-  try {
-    await user.save();
-  } catch (error) {
-    console.error('[profile:resume] failed to clear resume metadata', {
-      userId: String(user._id || user.id),
-      error: error.message,
-    });
-    return sendError(res, 'Failed to remove resume metadata', 500);
-  }
+  await user.save();
 
   return res.apiSuccess({ resume: null }, 'Resume removed');
 });
