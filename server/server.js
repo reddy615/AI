@@ -60,6 +60,7 @@ process.env.LOG_LEVEL = env.LOG_LEVEL;
 const app = require('./src/app');
 const registerInterviewSocket = require('./src/realtime/interviewSocket');
 const { ensureCodingChallengesSeeded } = require('./src/seed/ensureCodingChallenges');
+const { ensureAuthUsersSeeded } = require('./src/seed/ensureAuthUsersSeeded');
 
 function getCorsOrigins() {
   return String(env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:4173')
@@ -84,6 +85,15 @@ if (hasRedisUrl) {
 Promise.all(startupTasks)
   .then(async () => {
     if (hasMongoUri) {
+      try {
+        const authUserSeedResults = await ensureAuthUsersSeeded();
+        if (authUserSeedResults.length) {
+          console.log('Ensured authentication users exist in MongoDB:', authUserSeedResults);
+        }
+      } catch (error) {
+        console.warn('Unable to ensure authentication users on startup:', error.message);
+      }
+
       try {
         const seedResult = await ensureCodingChallengesSeeded();
         if (seedResult.seeded) {
