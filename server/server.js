@@ -69,57 +69,70 @@ function getCorsOrigins() {
     .filter(Boolean);
 }
 
-const startupTasks = [];
-if (hasMongoUri) {
-  startupTasks.push(connectDB());
-} else {
-  console.warn('MONGO_URI not set — skipping MongoDB connection.');
-}
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-if (hasRedisUrl) {
-  startupTasks.push(connectRedis());
-} else {
-  console.warn('REDIS_URL not set — skipping Redis connection.');
-}
+const io = new Server(server, {
+  cors: {
+    origin: getCorsOrigins(),
+    credentials: true,
+  },
+});
 
-Promise.all(startupTasks)
-  .then(async () => {
-    if (hasMongoUri) {
-      try {
-        const authUserSeedResults = await ensureAuthUsersSeeded();
-        if (authUserSeedResults.length) {
-          console.log('Ensured authentication users exist in MongoDB:', authUserSeedResults);
-        }
-      } catch (error) {
-        console.warn('Unable to ensure authentication users on startup:', error.message);
+registerInterviewSocket(io);
+app.set('io', io);
+
+async function bootstrapServices() {
+  if (!hasMongoUri) {
+    console.warn('MONGO_URI not set — skipping MongoDB connection.');
+  }
+
+  if (!hasRedisUrl) {
+    console.warn('REDIS_URL not set — skipping Redis connection.');
+  }
+
+  const startupTasks = [];
+  if (hasMongoUri) {
+    startupTasks.push(connectDB());
+  }
+
+  if (hasRedisUrl) {
+    startupTasks.push(connectRedis());
+  }
+
+  const results = await Promise.allSettled(startupTasks);
+
+  const mongoReady = hasMongoUri && results.some((item) => item.status === 'fulfilled');
+
+  if (mongoReady) {
+    try {
+      const authUserSeedResults = await ensureAuthUsersSeeded();
+      if (authUserSeedResults.length) {
+        console.log('Ensured authentication users exist in MongoDB:', authUserSeedResults);
       }
-
-      try {
-        const seedResult = await ensureCodingChallengesSeeded();
-        if (seedResult.seeded) {
-          console.log(`Seeded ${seedResult.count} coding challenges`);
-        }
-      } catch (error) {
-        console.warn('Unable to auto-seed coding challenges on startup:', error.message);
-      }
+    } catch (error) {
+      console.warn('Unable to ensure authentication users on startup:', error.message);
     }
 
-    const PORT = process.env.PORT || 5000;
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    try {
+      const seedResult = await ensureCodingChallengesSeeded();
+      if (seedResult.seeded) {
+        console.log(`Seeded ${seedResult.count} coding challenges`);
+      }
+    } catch (error) {
+      console.warn('Unable to auto-seed coding challenges on startup:', error.message);
+    }
+  }
 
-    const io = new Server(server, {
-      cors: {
-        origin: getCorsOrigins(),
-        credentials: true,
-      },
-    });
-
-    registerInterviewSocket(io);
-    app.set('io', io);
-  })
-  .catch((err) => {
-    console.error('Failed to start services during startup', err);
-    process.exit(1);
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn('Startup task failed:', result.reason?.message || result.reason);
+    }
   });
+}
+
+bootstrapServices().catch((err) => {
+  console.error('Bootstrap encountered an unexpected error', err);
+});
