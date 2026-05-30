@@ -9,22 +9,10 @@ const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
-
-const ADMIN_DEBUG_LOGS = process.env.ADMIN_DEBUG_LOGS === 'true';
+const { ensureAuthUsersSeeded } = require('../seed/ensureAuthUsersSeeded');
 
 function isMongoReady() {
   return mongoose.connection.readyState === 1;
-}
-
-function logAdmin(stage, label, details = {}) {
-  if (!ADMIN_DEBUG_LOGS) {
-    return;
-  }
-
-  console.info(`[admin:${stage}] ${label}`, {
-    mongoState: mongoose.connection.readyState,
-    ...details,
-  });
 }
 
 function toCount(value) {
@@ -33,27 +21,13 @@ function toCount(value) {
 
 async function runAdminQuery(label, task, fallback) {
   if (!isMongoReady()) {
-    logAdmin('skip', label, { reason: 'mongo-not-connected' });
     return fallback;
   }
 
-  logAdmin('start', label);
-
   try {
     const result = await task();
-    const summary = Array.isArray(result)
-      ? { count: result.length, sample: result[0] || null }
-      : result && typeof result === 'object'
-        ? { keys: Object.keys(result), sample: result }
-        : { value: result };
-
-    logAdmin('success', label, summary);
     return result ?? fallback;
   } catch (error) {
-    logAdmin('error', label, {
-      name: error.name,
-      message: error.message,
-    });
     return fallback;
   }
 }
@@ -85,29 +59,47 @@ exports.getSummary = asyncHandler(async (req, res) => {
       return item.value;
     }
 
-    logAdmin('error', `summary.settled.${index}`, {
-      name: item.reason?.name,
-      message: item.reason?.message,
-    });
-
     return index === 9 ? [] : 0;
   });
+
+  let resolvedUserCount = toCount(userCount);
+  let resolvedActiveUserCount = toCount(activeUserCount);
+  let resolvedAdminCount = toCount(adminCount);
+  let resolvedLeaderboard = leaderboard;
+  let resolvedAverageXp = toCount(averageXp);
+
+  if (isMongoReady() && resolvedUserCount === 0) {
+    await ensureAuthUsersSeeded();
+
+    const [seededUserCount, seededActiveUserCount, seededAdminCount, seededLeaderboard] = await Promise.all([
+      runAdminQuery('summary.seededUserCount', () => User.countDocuments(), 0),
+      runAdminQuery('summary.seededActiveUserCount', () => User.countDocuments({ isActive: true }), 0),
+      runAdminQuery('summary.seededAdminCount', () => User.countDocuments({ role: 'admin' }), 0),
+      runAdminQuery('summary.seededLeaderboard', () => getLeaderboard(10), []),
+    ]);
+
+    resolvedUserCount = toCount(seededUserCount);
+    resolvedActiveUserCount = toCount(seededActiveUserCount);
+    resolvedAdminCount = toCount(seededAdminCount);
+    resolvedLeaderboard = Array.isArray(seededLeaderboard) ? seededLeaderboard : [];
+    resolvedAverageXp = resolvedUserCount ? resolvedAverageXp : 0;
+  }
 
   return res.apiSuccess(
     {
       summary: {
-        userCount,
-        activeUserCount,
-        adminCount,
+        userCount: resolvedUserCount,
+        activeUserCount: resolvedActiveUserCount,
+        adminCount: resolvedAdminCount,
         questionCount,
         aiQuestionCount,
         attemptCount,
         codingCount,
         interviewCount,
         progressCount,
-        averageXp: toCount(averageXp),
+        averageXp: resolvedAverageXp,
       },
-      leaderboard,
+      leaderboard: resolvedLeaderboard,
     },
     'Admin summary loaded'
   );
@@ -148,12 +140,36 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
   const total = totalResult.status === 'fulfilled' ? totalResult.value : 0;
 
-  const progressByUser = users.length
-    ? await runAdminQuery('users.progress', () => UserProgress.find({ user: { $in: users.map((user) => user._id) } }).lean(), [])
+  let resolvedUsers = users;
+  let resolvedTotal = total;
+
+  if (isMongoReady() && resolvedUsers.length === 0 && !search && !role && isActive === undefined) {
+    await ensureAuthUsersSeeded();
+
+    const [seededUsersResult, seededTotalResult] = await Promise.allSettled([
+      runAdminQuery(
+        'users.seededList',
+        () => User.find(query)
+          .select('name email role isActive preferredLanguage createdAt updatedAt')
+          .sort({ createdAt: -1 })
+          .skip((safePage - 1) * safeLimit)
+          .limit(safeLimit)
+          .lean(),
+        []
+      ),
+      runAdminQuery('users.seededTotal', () => User.countDocuments(query), 0),
+    ]);
+
+    resolvedUsers = seededUsersResult.status === 'fulfilled' ? seededUsersResult.value : [];
+    resolvedTotal = seededTotalResult.status === 'fulfilled' ? seededTotalResult.value : 0;
+  }
+
+  const progressByUser = resolvedUsers.length
+    ? await runAdminQuery('users.progress', () => UserProgress.find({ user: { $in: resolvedUsers.map((user) => user._id) } }).lean(), [])
     : [];
   const progressMap = new Map((progressByUser || []).map((item) => [String(item.user), item]));
 
-  const data = users.map((user) => {
+  const data = resolvedUsers.map((user) => {
     const progress = progressMap.get(String(user._id));
     return {
       ...user,
@@ -164,7 +180,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
     };
   });
 
-  return res.apiSuccess({ users: data, total, page: safePage, limit: safeLimit }, 'Users loaded');
+  return res.apiSuccess({ users: data, total: resolvedTotal, page: safePage, limit: safeLimit }, 'Users loaded');
 });
 
 exports.updateUser = asyncHandler(async (req, res) => {

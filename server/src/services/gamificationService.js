@@ -2,8 +2,6 @@ const User = require('../models/User');
 const UserProgress = require('../models/UserProgress');
 const { getRedisClient } = require('../config/redis');
 
-const ADMIN_DEBUG_LOGS = process.env.ADMIN_DEBUG_LOGS === 'true';
-
 const BADGES = [
   { key: 'first-quiz', title: 'First Quiz', description: 'Completed your first quiz attempt.' },
   { key: 'streak-3', title: 'Three-Day Streak', description: 'Learned three days in a row.' },
@@ -152,19 +150,9 @@ async function getLeaderboard(limit = 10) {
   const redis = getRedisClient();
   const cacheKey = `gamification:leaderboard:${safeLimit}`;
 
-  if (ADMIN_DEBUG_LOGS) {
-    console.info('[gamification:getLeaderboard:start]', {
-      mongoState: require('mongoose').connection.readyState,
-      limit: safeLimit,
-    });
-  }
-
   if (redis) {
     const cached = await redis.get(cacheKey);
     if (cached) {
-      if (ADMIN_DEBUG_LOGS) {
-        console.info('[gamification:getLeaderboard:cache-hit]', { limit: safeLimit, count: JSON.parse(cached).length });
-      }
       return JSON.parse(cached);
     }
   }
@@ -202,13 +190,6 @@ async function getLeaderboard(limit = 10) {
 
     return leaderboard;
   } catch (error) {
-    if (ADMIN_DEBUG_LOGS) {
-      console.info('[gamification:getLeaderboard:error]', {
-        name: error.name,
-        message: error.message,
-      });
-    }
-
     return [];
   }
 }
