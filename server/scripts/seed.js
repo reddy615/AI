@@ -14,9 +14,15 @@ const { LOCAL_USERS } = require('../src/config/localUsers')
 const { generateAll } = require('../src/seed/questions')
 const { generateCodingChallenges } = require('../src/seed/codingChallenges')
 
+function isBcryptHash(value){
+  return typeof value === 'string' && /^\$2[aby]?\$\d{2}\$/.test(value)
+}
+
 async function seedUsers(force){
   for (const defaultUser of LOCAL_USERS){
-    const hash = await bcrypt.hash(defaultUser.password, 10)
+    const hash = isBcryptHash(defaultUser.password)
+      ? defaultUser.password
+      : await bcrypt.hash(defaultUser.password, 10)
     await User.updateOne(
       { email: defaultUser.email },
       {

@@ -2,11 +2,17 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { LOCAL_USERS } = require('../config/localUsers');
 
+function isBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]?\$\d{2}\$/.test(value);
+}
+
 async function ensureAuthUsersSeeded() {
   const results = [];
 
   for (const defaultUser of LOCAL_USERS) {
-    const hash = await bcrypt.hash(defaultUser.password, 10);
+    const hash = isBcryptHash(defaultUser.password)
+      ? defaultUser.password
+      : await bcrypt.hash(defaultUser.password, 10);
     const updateResult = await User.updateOne(
       { email: defaultUser.email },
       {
