@@ -1,9 +1,15 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { serializeUserProfile } = require('../utils/userProfile');
+const { ensureAuthUsersSeeded } = require('../seed/ensureAuthUsersSeeded');
+
+function isDatabaseReady() {
+  return mongoose.connection.readyState === 1;
+}
 
 function buildTokenPayload(user) {
   if (!user?._id) {
@@ -52,6 +58,10 @@ function attachAuthPayload(res, user, tokens, message) {
 
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
+  if (!isDatabaseReady()) {
+    return sendError(res, 'Database unavailable. Please try again.', 503);
+  }
+
   const existing = await User.findOne({ email });
   if (existing) return sendError(res, 'Email already in use', 400);
   const salt = await bcrypt.genSalt(10);
@@ -64,7 +74,16 @@ exports.register = asyncHandler(async (req, res) => {
 
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
+  if (!isDatabaseReady()) {
+    return sendError(res, 'Database unavailable. Please try again.', 503);
+  }
+
+  let user = await User.findOne({ email });
+  if (!user) {
+    await ensureAuthUsersSeeded();
+    user = await User.findOne({ email });
+  }
+
   if (!user || !user.isActive || typeof user.password !== 'string' || !user.password) {
     return sendError(res, 'Invalid credentials', 400);
   }
@@ -78,6 +97,10 @@ exports.login = asyncHandler(async (req, res) => {
 });
 
 exports.me = asyncHandler(async (req, res) => {
+  if (!isDatabaseReady()) {
+    return sendError(res, 'Database unavailable. Please try again.', 503);
+  }
+
   const user = await User.findById(req.user.id).select('-password');
   if (!user) {
     return sendError(res, 'User not found', 404);
@@ -87,6 +110,10 @@ exports.me = asyncHandler(async (req, res) => {
 });
 
 exports.refresh = asyncHandler(async (req, res) => {
+  if (!isDatabaseReady()) {
+    return sendError(res, 'Database unavailable. Please try again.', 503);
+  }
+
   const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
   if (!incoming) return sendError(res, 'Refresh token required', 401);
 
@@ -112,6 +139,17 @@ exports.refresh = asyncHandler(async (req, res) => {
 });
 
 exports.logout = asyncHandler(async (req, res) => {
+  if (!isDatabaseReady()) {
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
+      sameSite: (process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production') ? 'none' : 'lax',
+      domain: process.env.COOKIE_DOMAIN || undefined,
+    });
+
+    return sendError(res, 'Database unavailable. Please try again.', 503);
+  }
+
   const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
   if (incoming) {
     try {
