@@ -6,24 +6,29 @@ async function ensureAuthUsersSeeded() {
   const results = [];
 
   for (const defaultUser of LOCAL_USERS) {
-    const existing = await User.findOne({ email: defaultUser.email }).select('_id email');
-    if (existing) {
-      results.push({ email: defaultUser.email, action: 'exists' });
-      continue;
-    }
-
     const hash = await bcrypt.hash(defaultUser.password, 10);
-    await User.create({
-      name: defaultUser.name,
-      email: defaultUser.email,
-      password: hash,
-      role: defaultUser.role || 'user',
-      preferredLanguage: defaultUser.preferredLanguage || 'en',
-      isActive: true,
-      refreshTokenVersion: 0,
-    });
+    const updateResult = await User.updateOne(
+      { email: defaultUser.email },
+      {
+        $set: {
+          name: defaultUser.name,
+          email: defaultUser.email,
+          password: hash,
+          role: defaultUser.role || 'user',
+          preferredLanguage: defaultUser.preferredLanguage || 'en',
+          isActive: true,
+        },
+        $setOnInsert: {
+          refreshTokenVersion: 0,
+        },
+      },
+      { upsert: true }
+    );
 
-    results.push({ email: defaultUser.email, action: 'seeded' });
+    results.push({
+      email: defaultUser.email,
+      action: updateResult.upsertedCount ? 'seeded' : 'updated',
+    });
   }
 
   return results;
