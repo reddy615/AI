@@ -1,16 +1,36 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { uploadBuffer, deleteAsset, hasCloudinaryConfig } = require('../config/cloudinary');
 const { serializeUserProfile } = require('../utils/userProfile');
+const { findLocalUserById, findLocalUserByEmail, updateLocalUser } = require('../config/localUsers');
+
+function isDatabaseReady() {
+  return mongoose.connection.readyState === 1;
+}
 
 async function findDatabaseUser(req, { includePassword = false } = {}) {
-  const query = User.findById(req.user.id);
-  if (!includePassword) {
-    query.select('-password');
+  if (isDatabaseReady()) {
+    const query = User.findById(req.user.id);
+    if (!includePassword) {
+      query.select('-password');
+    }
+
+    return query;
   }
 
-  return query;
+  const localUser = findLocalUserById(req.user.id) || findLocalUserByEmail(req.user.email);
+  if (!localUser) {
+    return null;
+  }
+
+  if (includePassword) {
+    return localUser;
+  }
+
+  const { password, ...safeUser } = localUser;
+  return safeUser;
 }
 
 exports.getProfile = asyncHandler(async (req, res) => {
@@ -36,8 +56,16 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
   }
 
   if (preferredLanguage) {
-    user.preferredLanguage = preferredLanguage;
-    await user.save();
+    if (isDatabaseReady()) {
+      user.preferredLanguage = preferredLanguage;
+      await user.save();
+    } else {
+      const updated = updateLocalUser(user.id, { preferredLanguage });
+      if (!updated) {
+        return sendError(res, 'Failed to update preferences', 500);
+      }
+      user.preferredLanguage = updated.preferredLanguage;
+    }
   }
 
   return res.apiSuccess({ preferredLanguage: user.preferredLanguage || 'en' }, 'Preferences updated');
@@ -52,6 +80,34 @@ exports.uploadResume = asyncHandler(async (req, res) => {
     return sendError(res, 'User not found', 404);
   }
 
+  const originalName = req.file.originalname || 'resume';
+
+  if (!isDatabaseReady()) {
+    const localResumeUrl = `local-resume://${encodeURIComponent(originalName)}`;
+    const updated = updateLocalUser(user.id, {
+      resume: localResumeUrl,
+      resumeUrl: localResumeUrl,
+      resumeFileName: originalName,
+      resumePublicId: null,
+      resumeResourceType: 'raw',
+    });
+
+    if (!updated) {
+      return sendError(res, 'Failed to save local resume details', 500);
+    }
+
+    return res.apiSuccess(
+      {
+        resume: updated.resume,
+        resumeUrl: updated.resumeUrl,
+        resumeFileName: updated.resumeFileName,
+        resumePublicId: updated.resumePublicId,
+        resumeResourceType: updated.resumeResourceType,
+      },
+      'Resume uploaded'
+    );
+  }
+
   if (!hasCloudinaryConfig()) {
     return sendError(res, 'Cloudinary is not configured for resume uploads', 500);
   }
@@ -64,7 +120,6 @@ exports.uploadResume = asyncHandler(async (req, res) => {
     }
   }
 
-  const originalName = req.file.originalname || 'resume';
   let uploadResult;
   try {
     uploadResult = await uploadBuffer(req.file.buffer, {
@@ -112,6 +167,22 @@ exports.deleteResume = asyncHandler(async (req, res) => {
   const user = await findDatabaseUser(req, { includePassword: true });
   if (!user) {
     return sendError(res, 'User not found', 404);
+  }
+
+  if (!isDatabaseReady()) {
+    const updated = updateLocalUser(user.id, {
+      resume: null,
+      resumeUrl: null,
+      resumePublicId: null,
+      resumeFileName: null,
+      resumeResourceType: null,
+    });
+
+    if (!updated) {
+      return sendError(res, 'Failed to remove local resume details', 500);
+    }
+
+    return res.apiSuccess({ resume: null }, 'Resume removed');
   }
 
   if (user.resumePublicId) {
