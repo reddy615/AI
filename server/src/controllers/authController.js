@@ -69,14 +69,6 @@ exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   console.log('[auth:login] request received', { email });
 
-  const localUser = findLocalUserByEmail(email);
-  if (localUser && localUser.password === password) {
-    const tokens = issueTokens(localUser);
-    setRefreshCookie(res, tokens.refreshToken);
-    console.log('[auth:login] local user authenticated', { email, userId: localUser.id });
-    return attachAuthPayload(res, localUser, tokens, 'Login successful');
-  }
-
   try {
     const user = await User.findOne({ email });
     if (user && user.isActive && typeof user.password === 'string' && user.password) {
@@ -89,6 +81,14 @@ exports.login = asyncHandler(async (req, res) => {
     }
   } catch (error) {
     console.warn('[auth:login] database lookup failed, falling back to local user store', { email, error: error.message });
+  }
+
+  const localUser = findLocalUserByEmail(email);
+  if (localUser && localUser.password === password) {
+    const tokens = issueTokens(localUser);
+    setRefreshCookie(res, tokens.refreshToken);
+    console.log('[auth:login] local user authenticated', { email, userId: localUser.id });
+    return attachAuthPayload(res, localUser, tokens, 'Login successful');
   }
 
   if (!localUser || localUser.password !== password) {

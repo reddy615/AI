@@ -3,11 +3,38 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { findLocalUserById, updateLocalUser } = require('../config/localUsers');
 
+async function findDatabaseUser(req, { includePassword = false } = {}) {
+  try {
+    const byIdQuery = User.findById(req.user.id);
+    if (!includePassword) {
+      byIdQuery.select('-password');
+    }
+
+    const byId = await byIdQuery;
+    if (byId) {
+      return byId;
+    }
+  } catch (error) {
+    // Fall back to lookup by email when the token id belongs to a local account.
+  }
+
+  if (req.user?.email) {
+    const byEmailQuery = User.findOne({ email: req.user.email });
+    if (!includePassword) {
+      byEmailQuery.select('-password');
+    }
+
+    return byEmailQuery;
+  }
+
+  return null;
+}
+
 exports.getProfile = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password').lean();
+    const user = await findDatabaseUser(req);
     if (user) {
-      return res.apiSuccess({ user }, 'Profile loaded');
+      return res.apiSuccess({ user: user.toObject ? user.toObject() : user }, 'Profile loaded');
     }
   } catch (error) {
     // Fall back to local users.
@@ -40,7 +67,7 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
   }
 
   try {
-    const user = await User.findById(req.user.id);
+    const user = await findDatabaseUser(req, { includePassword: true });
     if (user) {
       if (preferredLanguage) {
         user.preferredLanguage = preferredLanguage;
@@ -62,7 +89,7 @@ exports.updatePreferences = asyncHandler(async (req, res) => {
 exports.uploadResume = asyncHandler(async (req, res) => {
   if (!req.file) return sendError(res, 'No file uploaded', 400);
   try {
-    const user = await User.findById(req.user.id);
+    const user = await findDatabaseUser(req, { includePassword: true });
     if (user) {
       user.resume = `/uploads/${req.file.filename}`;
       await user.save();
