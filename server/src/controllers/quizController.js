@@ -35,6 +35,31 @@ function buildLocalQuestionPayload(question, module) {
   };
 }
 
+function shuffleQuestions(questions) {
+  return [...questions].sort(() => Math.random() - 0.5);
+}
+
+function pickUniqueQuestions(questions, count) {
+  const seenTexts = new Set();
+  const uniqueQuestions = [];
+
+  for (const question of questions) {
+    const questionText = String(question?.text || '').trim().toLowerCase();
+    if (!questionText || seenTexts.has(questionText)) {
+      continue;
+    }
+
+    seenTexts.add(questionText);
+    uniqueQuestions.push(question);
+
+    if (uniqueQuestions.length >= count) {
+      break;
+    }
+  }
+
+  return uniqueQuestions;
+}
+
 function buildLocalQuizQuestions(module, difficulty, category, count) {
   const sourceQuestions = generateModuleQuestions(module, Math.max(count, 10));
   const filteredQuestions = sourceQuestions.filter((question) => {
@@ -43,16 +68,16 @@ function buildLocalQuizQuestions(module, difficulty, category, count) {
     return true;
   });
 
-  const selectedQuestions = (filteredQuestions.length ? filteredQuestions : sourceQuestions).slice(0, count);
+  const selectedQuestions = pickUniqueQuestions(filteredQuestions.length ? filteredQuestions : sourceQuestions, count);
   return selectedQuestions.map((question) => buildLocalQuestionPayload(question, module));
 }
 
 function buildAptitudePracticeQuestions(perTopicCount = 2) {
-  return getAptitudeTopics().flatMap((topic, topicIndex) => {
-    const topicQuestions = generateAptitudeQuestionsForTopic(topicIndex, 80);
-    const shuffledQuestions = [...topicQuestions].sort(() => Math.random() - 0.5);
-    return shuffledQuestions.slice(0, perTopicCount).map((question) => buildLocalQuestionPayload(question, 'aptitude'));
-  });
+  const totalQuestions = getAptitudeTopics().length * perTopicCount;
+  const allQuestions = getAptitudeTopics().flatMap((topic, topicIndex) => generateAptitudeQuestionsForTopic(topicIndex, 80));
+  const uniqueQuestions = pickUniqueQuestions(shuffleQuestions(allQuestions), totalQuestions);
+
+  return uniqueQuestions.map((question) => buildLocalQuestionPayload(question, 'aptitude'));
 }
 
 function buildReasoningPracticeQuestions(perTopicCount = 2) {
