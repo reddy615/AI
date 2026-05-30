@@ -121,28 +121,5 @@ Promise.all(startupTasks)
   })
   .catch((err) => {
     console.error('Failed to start services during startup', err);
-    // If secrets or external services are missing, exit only in production unless override is set
-    if (env.NODE_ENV === 'production' && !env.ALLOW_INSECURE_SECRETS) {
-      process.exit(1);
-    } else {
-      console.warn('Continuing startup despite startup errors due to ALLOW_INSECURE_SECRETS flag.');
-      const PORT = process.env.PORT || 5000;
-      const server = app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on port ${PORT} (partial mode)`);
-      });
-
-      const io = new Server(server, {
-        cors: {
-          origin: getCorsOrigins(),
-          credentials: true,
-        },
-      });
-
-      try {
-        registerInterviewSocket(io);
-        app.set('io', io);
-      } catch (e) {
-        console.warn('Socket registration skipped due to startup error.');
-      }
-    }
+    process.exit(1);
   });

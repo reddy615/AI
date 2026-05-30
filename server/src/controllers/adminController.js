@@ -9,7 +9,6 @@ const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
-const { ensureAuthUsersSeeded } = require('../seed/ensureAuthUsersSeeded');
 
 function isMongoReady() {
   return mongoose.connection.readyState === 1;
@@ -62,28 +61,11 @@ exports.getSummary = asyncHandler(async (req, res) => {
     return index === 9 ? [] : 0;
   });
 
-  let resolvedUserCount = toCount(userCount);
-  let resolvedActiveUserCount = toCount(activeUserCount);
-  let resolvedAdminCount = toCount(adminCount);
-  let resolvedLeaderboard = leaderboard;
-  let resolvedAverageXp = toCount(averageXp);
-
-  if (isMongoReady() && resolvedUserCount === 0) {
-    await ensureAuthUsersSeeded();
-
-    const [seededUserCount, seededActiveUserCount, seededAdminCount, seededLeaderboard] = await Promise.all([
-      runAdminQuery('summary.seededUserCount', () => User.countDocuments(), 0),
-      runAdminQuery('summary.seededActiveUserCount', () => User.countDocuments({ isActive: true }), 0),
-      runAdminQuery('summary.seededAdminCount', () => User.countDocuments({ role: 'admin' }), 0),
-      runAdminQuery('summary.seededLeaderboard', () => getLeaderboard(10), []),
-    ]);
-
-    resolvedUserCount = toCount(seededUserCount);
-    resolvedActiveUserCount = toCount(seededActiveUserCount);
-    resolvedAdminCount = toCount(seededAdminCount);
-    resolvedLeaderboard = Array.isArray(seededLeaderboard) ? seededLeaderboard : [];
-    resolvedAverageXp = resolvedUserCount ? resolvedAverageXp : 0;
-  }
+  const resolvedUserCount = toCount(userCount);
+  const resolvedActiveUserCount = toCount(activeUserCount);
+  const resolvedAdminCount = toCount(adminCount);
+  const resolvedLeaderboard = leaderboard;
+  const resolvedAverageXp = toCount(averageXp);
 
   return res.apiSuccess(
     {
@@ -123,6 +105,13 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
 
+  const directCount = await runAdminQuery('users.directCount', () => User.countDocuments(query), 0);
+  const directFirstFive = await runAdminQuery(
+    'users.directFirstFive',
+    () => User.find(query).select('_id name email role').sort({ createdAt: -1 }).limit(5).lean(),
+    []
+  );
+
   const [usersResult, totalResult] = await Promise.allSettled([
     runAdminQuery(
       'users.list',
@@ -140,29 +129,8 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
   const total = totalResult.status === 'fulfilled' ? totalResult.value : 0;
 
-  let resolvedUsers = users;
-  let resolvedTotal = total;
-
-  if (isMongoReady() && resolvedUsers.length === 0 && !search && !role && isActive === undefined) {
-    await ensureAuthUsersSeeded();
-
-    const [seededUsersResult, seededTotalResult] = await Promise.allSettled([
-      runAdminQuery(
-        'users.seededList',
-        () => User.find(query)
-          .select('name email role isActive preferredLanguage createdAt updatedAt')
-          .sort({ createdAt: -1 })
-          .skip((safePage - 1) * safeLimit)
-          .limit(safeLimit)
-          .lean(),
-        []
-      ),
-      runAdminQuery('users.seededTotal', () => User.countDocuments(query), 0),
-    ]);
-
-    resolvedUsers = seededUsersResult.status === 'fulfilled' ? seededUsersResult.value : [];
-    resolvedTotal = seededTotalResult.status === 'fulfilled' ? seededTotalResult.value : 0;
-  }
+  const resolvedUsers = users;
+  const resolvedTotal = total;
 
   const progressByUser = resolvedUsers.length
     ? await runAdminQuery('users.progress', () => UserProgress.find({ user: { $in: resolvedUsers.map((user) => user._id) } }).lean(), [])
