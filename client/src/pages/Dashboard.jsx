@@ -14,6 +14,24 @@ function getResumeName(resumePath) {
   return String(resumePath).split('/').filter(Boolean).pop() || ''
 }
 
+function extractProfileData(response) {
+  const payload = response?.data
+  return (
+    payload?.data?.user ||
+    payload?.user ||
+    payload?.data?.profile ||
+    payload?.profile ||
+    payload?.data ||
+    payload ||
+    null
+  )
+}
+
+function extractResumeData(response) {
+  const payload = response?.data
+  return payload?.data || payload || {}
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [analytics, setAnalytics] = useState(null)
@@ -29,26 +47,28 @@ export default function Dashboard() {
   const resumeUrl = user?.resumeUrl || user?.resume || ''
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
 
+  const loadProfile = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
+    try {
+      const profileResponse = await api.get('/api/profile')
+      const profileData = extractProfileData(profileResponse)
+      setUser(profileData)
+      if (profileData) {
+        localStorage.setItem('user', JSON.stringify(profileData))
+      }
+      return profileData
+    } catch (error) {
+      console.error(error)
+      return null
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
   const loadDashboard = async () => {
     setLoading(true)
     try {
-      const profileResponse = await api.get('/api/profile')
-      console.log('[dashboard] profile response inspection', {
-        data: profileResponse.data,
-        dataUser: profileResponse.data?.data?.user,
-        dataProfile: profileResponse.data?.data?.profile,
-        responseUser: profileResponse.data?.user,
-        responseProfile: profileResponse.data?.profile,
-      })
-
-      const profileData =
-        profileResponse.data?.data?.user ||
-        profileResponse.data?.user ||
-        profileResponse.data?.profile ||
-        profileResponse.data?.data ||
-        profileResponse.data
-
-      setUser(profileData)
+      await loadProfile({ silent: true })
 
       const [analyticsResult, recommendationsResult, gamificationResult] = await Promise.allSettled([
         api.get('/api/analytics/overview'),
@@ -120,15 +140,23 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 
-      const uploadedResume = response.data?.data?.resume || response.data?.resume
-      setUser((current) => ({
-        ...(current || {}),
-        resume: response.data?.data?.resume || uploadedResume,
-        resumeUrl: response.data?.data?.resumeUrl || uploadedResume,
-        resumeFileName: response.data?.data?.resumeFileName || resumeFile?.name || getResumeName(uploadedResume),
-        resumePublicId: response.data?.data?.resumePublicId || current?.resumePublicId || null,
-        resumeResourceType: response.data?.data?.resumeResourceType || current?.resumeResourceType || null,
-      }))
+      const resumeData = extractResumeData(response)
+      const uploadedResume = resumeData?.resumeUrl || resumeData?.resume || ''
+      const nextUser = {
+        ...(user || {}),
+        resume: resumeData?.resume || uploadedResume,
+        resumeUrl: resumeData?.resumeUrl || uploadedResume,
+        resumeFileName: resumeData?.resumeFileName || resumeFile?.name || getResumeName(uploadedResume),
+        resumePublicId: resumeData?.resumePublicId || user?.resumePublicId || null,
+        resumeResourceType: resumeData?.resumeResourceType || user?.resumeResourceType || null,
+      }
+
+      setUser(nextUser)
+      localStorage.setItem('user', JSON.stringify(nextUser))
+
+      // Pull latest persisted profile to avoid stale client state after upload.
+      await loadProfile({ silent: true })
+
       setResumeMessage('Resume uploaded successfully.')
       setResumeFile(null)
       event.target.reset()
@@ -145,14 +173,18 @@ export default function Dashboard() {
 
     try {
       await api.delete('/api/profile/resume')
-      setUser((current) => ({
-        ...(current || {}),
+      const nextUser = {
+        ...(user || {}),
         resume: null,
         resumeUrl: null,
         resumeFileName: null,
         resumePublicId: null,
         resumeResourceType: null,
-      }))
+      }
+
+      setUser(nextUser)
+      localStorage.setItem('user', JSON.stringify(nextUser))
+      await loadProfile({ silent: true })
       setResumeMessage('Resume removed successfully.')
     } catch (error) {
       setResumeError(error.response?.data?.message || 'Resume removal failed.')
@@ -260,10 +292,18 @@ export default function Dashboard() {
                           href={resumeUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex break-all text-sm font-medium text-blue-600 hover:text-blue-700"
+                          className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                         >
-                          {resumeFileName || 'Open uploaded resume'}
+                          View Resume
                         </a>
+                        <a
+                          href={resumeUrl}
+                          download={resumeFileName || 'resume'}
+                          className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          Download Resume
+                        </a>
+                        <span className="text-xs text-slate-500">{resumeFileName || 'resume'}</span>
                         <button
                           type="button"
                           onClick={removeResume}
