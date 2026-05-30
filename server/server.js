@@ -12,7 +12,7 @@ const isLocalMongoUri = !mongoUri
   || mongoUri === defaultMongoUri
   || mongoUri.includes('localhost:27017')
   || mongoUri.includes('127.0.0.1:27017');
-const hasMongoUri = Boolean(mongoUri && !isLocalMongoUri);
+const hasMongoUri = Boolean(mongoUri);
 const hasRedisUrl = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim());
 
 if (env.NODE_ENV === 'production') {
