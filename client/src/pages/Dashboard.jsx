@@ -4,6 +4,8 @@ import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import StatsCard from '../components/StatsCard'
 import PerformanceLineChart from '../components/PerformanceLineChart'
+import { useDispatch } from 'react-redux'
+import { clearToken, setUser as setAuthUser } from '../store/store'
 
 function formatPercent(value) {
   return `${Number(value || 0)}%`
@@ -43,6 +45,7 @@ export default function Dashboard() {
   const [resumeMessage, setResumeMessage] = useState('')
   const [resumeError, setResumeError] = useState('')
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const resumeUrl = user?.resumeUrl || user?.resume || ''
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
@@ -53,6 +56,7 @@ export default function Dashboard() {
       const profileResponse = await api.get('/api/profile')
       const profileData = extractProfileData(profileResponse)
       setUser(profileData)
+      dispatch(setAuthUser(profileData))
       if (profileData) {
         localStorage.setItem('user', JSON.stringify(profileData))
       }
@@ -116,7 +120,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error)
     } finally {
-      localStorage.removeItem('token')
+      dispatch(clearToken())
+      localStorage.removeItem('user')
       window.location.href = '/'
     }
   }
@@ -156,6 +161,7 @@ export default function Dashboard() {
       }
 
       setUser(nextUser)
+      dispatch(setAuthUser(nextUser))
       localStorage.setItem('user', JSON.stringify(nextUser))
 
       // Pull latest persisted profile to avoid stale client state after upload.
@@ -176,7 +182,7 @@ export default function Dashboard() {
     setResumeMessage('')
 
     try {
-      await api.delete('/api/profile/resume')
+      const response = await api.delete('/api/profile/resume')
       const nextUser = {
         ...(user || {}),
         resume: null,
@@ -187,6 +193,7 @@ export default function Dashboard() {
       }
 
       setUser(nextUser)
+      dispatch(setAuthUser(nextUser))
       localStorage.setItem('user', JSON.stringify(nextUser))
       await loadProfile({ silent: true })
       setResumeMessage('Resume removed successfully.')

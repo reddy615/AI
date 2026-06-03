@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import api from '../api/api'
 import { useNavigate, Link } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { setToken, setUser } from '../store/store'
 
 export default function Login(){
   const [email,setEmail]=useState('')
@@ -8,13 +10,34 @@ export default function Login(){
   const [showPassword,setShowPassword]=useState(false)
   const [error,setError]=useState(null)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const submit = async (e)=>{
     e.preventDefault()
     try{
       const res = await api.post('/api/auth/login',{email,password})
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify(res.data.user || {}))
+
+      const loginPayload = res.data?.data || res.data || {}
+      const token = loginPayload.token || loginPayload.accessToken || res.data?.token || null
+
+      if (token) {
+        dispatch(setToken(token))
+      }
+
+      const loginUser = loginPayload.user || res.data?.user || null
+
+      let hydratedUser = loginUser
+      try {
+        const profileResponse = await api.get('/api/profile')
+        const profileData = profileResponse.data?.data?.user || profileResponse.data?.user || profileResponse.data?.data || profileResponse.data || null
+        hydratedUser = profileData || hydratedUser
+      } catch (profileError) {
+        console.error(profileError.response?.data || profileError.message)
+      }
+
+      if (hydratedUser) {
+        dispatch(setUser(hydratedUser))
+      }
       navigate('/dashboard')
     }catch(err){ setError(err.response?.data?.message || 'Error') }
   }

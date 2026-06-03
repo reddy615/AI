@@ -66,11 +66,27 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-	res.status(200).json({
+	const mongoose = require('mongoose');
+	const readyState = mongoose.connection.readyState;
+	const readyStateMap = {
+		0: 'disconnected',
+		1: 'connected',
+		2: 'connecting',
+		3: 'disconnecting',
+	};
+
+	res.status(readyState === 1 ? 200 : 503).json({
 		success: true,
-		status: 'ok',
+		status: readyState === 1 ? 'ok' : 'degraded',
 		uptime: process.uptime(),
 		timestamp: new Date().toISOString(),
+		mongodb: {
+			readyState,
+			readyStateDescription: readyStateMap[readyState] || 'unknown',
+			connected: readyState === 1,
+			host: mongoose.connection.host || 'N/A',
+			name: mongoose.connection.name || 'N/A',
+		},
 	});
 });
 
@@ -87,9 +103,13 @@ app.get('/', (req, res, next) => {
 });
 
 app.get('/ready', (req, res) => {
-	res.status(200).json({
-		success: true,
-		status: 'ready',
+	const mongoose = require('mongoose');
+	const mongoReady = mongoose.connection.readyState === 1;
+	
+	res.status(mongoReady ? 200 : 503).json({
+		success: mongoReady,
+		status: mongoReady ? 'ready' : 'not_ready',
+		mongodb: mongoReady ? 'connected' : 'disconnected',
 	});
 });
 

@@ -71,7 +71,12 @@ function getCorsOrigins() {
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`[server.js] Server running on port ${PORT}`);
+  console.log('[server.js] Environment:', {
+    NODE_ENV: env.NODE_ENV,
+    MONGO_URI_SET: Boolean(mongoUri),
+    REDIS_URL_SET: hasRedisUrl,
+  });
 });
 
 const io = new Server(server, {
@@ -85,12 +90,14 @@ registerInterviewSocket(io);
 app.set('io', io);
 
 async function bootstrapServices() {
+  console.log('[server.js] Bootstrap starting');
+
   if (!hasMongoUri) {
-    console.warn('MONGO_URI not set — skipping MongoDB connection.');
+    console.warn('[server.js] MONGO_URI not set — skipping MongoDB connection.');
   }
 
   if (!hasRedisUrl) {
-    console.warn('REDIS_URL not set — skipping Redis connection.');
+    console.warn('[server.js] REDIS_URL not set — skipping Redis connection.');
   }
 
   const startupTasks = [];
@@ -103,36 +110,46 @@ async function bootstrapServices() {
   }
 
   const results = await Promise.allSettled(startupTasks);
-
   const mongoReady = hasMongoUri && results.some((item) => item.status === 'fulfilled');
 
   if (mongoReady) {
     try {
       const authUserSeedResults = await ensureAuthUsersSeeded();
       if (authUserSeedResults.length) {
-        console.log('Ensured authentication users exist in MongoDB:', authUserSeedResults);
+        console.log('[server.js] Ensured authentication users exist in MongoDB:', authUserSeedResults);
       }
     } catch (error) {
-      console.warn('Unable to ensure authentication users on startup:', error.message);
+      console.warn('[server.js] Unable to ensure authentication users on startup:', error.message);
     }
 
     try {
       const seedResult = await ensureCodingChallengesSeeded();
       if (seedResult.seeded) {
-        console.log(`Seeded ${seedResult.count} coding challenges`);
+        console.log(`[server.js] Seeded ${seedResult.count} coding challenges`);
       }
     } catch (error) {
-      console.warn('Unable to auto-seed coding challenges on startup:', error.message);
+      console.warn('[server.js] Unable to auto-seed coding challenges on startup:', error.message);
     }
+  } else {
+    console.warn('[server.js] MongoDB connection failed or not attempted. Application starting in degraded mode.');
   }
 
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      console.warn('Startup task failed:', result.reason?.message || result.reason);
+      console.error('[server.js] Startup task failed:', {
+        index,
+        reason: result.reason?.message || String(result.reason),
+        fullReason: result.reason,
+      });
     }
   });
 }
 
 bootstrapServices().catch((err) => {
-  console.error('Bootstrap encountered an unexpected error', err);
+  console.error('[server.js] Bootstrap encountered an unexpected error', {
+    message: err.message,
+    code: err.code,
+    name: err.name,
+    stack: err.stack,
+  });
 });
