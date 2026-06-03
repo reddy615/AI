@@ -1,381 +1,230 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import React, { useEffect, useState, useRef } from 'react'
 import api from '../api/api'
-import Skeleton from '../components/Skeleton'
-import StatsCard from '../components/StatsCard'
-import PerformanceLineChart from '../components/PerformanceLineChart'
 import { useDispatch } from 'react-redux'
-import { clearToken, setUser as setAuthUser } from '../store/store'
-
-function formatPercent(value) {
-  return `${Number(value || 0)}%`
-}
+import { setUser as setAuthUser } from '../store/store'
 
 function getResumeName(resumePath) {
   if (!resumePath) return ''
-  return String(resumePath).split('/').filter(Boolean).pop() || ''
-}
-
-function extractProfileData(response) {
-  const payload = response?.data
-  return (
-    payload?.data?.user ||
-    payload?.user ||
-    payload?.data?.profile ||
-    payload?.profile ||
-    payload?.data ||
-    payload ||
-    null
-  )
-}
-
-function extractResumeData(response) {
-  const payload = response?.data
-  return payload?.data || payload || {}
+  try {
+    const url = new URL(resumePath)
+    return url.pathname.split('/').filter(Boolean).pop() || ''
+  } catch (e) {
+    return String(resumePath).split('/').filter(Boolean).pop() || ''
+  }
 }
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
-  const [analytics, setAnalytics] = useState(null)
-  const [recommendations, setRecommendations] = useState([])
-  const [gamification, setGamification] = useState(null)
   const [loading, setLoading] = useState(true)
   const [resumeFile, setResumeFile] = useState(null)
   const [resumeUploading, setResumeUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [resumeMessage, setResumeMessage] = useState('')
   const [resumeError, setResumeError] = useState('')
-  const navigate = useNavigate()
   const dispatch = useDispatch()
+  const fileInputRef = useRef(null)
 
   const resumeUrl = user?.resumeUrl || user?.resume || ''
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
 
-  const loadProfile = async ({ silent = false } = {}) => {
+  async function loadProfile({ silent = false } = {}) {
     if (!silent) setLoading(true)
     try {
-      const profileResponse = await api.get('/api/profile')
-      const profileData = extractProfileData(profileResponse)
-      setUser(profileData)
-      dispatch(setAuthUser(profileData))
-      if (profileData) {
-        localStorage.setItem('user', JSON.stringify(profileData))
-      }
-      return profileData
-    } catch (error) {
-      console.error(error)
+      const resp = await api.get('/api/profile')
+      const data = resp?.data?.data?.user || resp?.data?.user || resp?.data || resp?.data?.profile || null
+      setUser(data)
+      dispatch(setAuthUser(data))
+      if (data) localStorage.setItem('user', JSON.stringify(data))
+      return data
+    } catch (err) {
+      console.error('Failed to load profile', err)
       return null
     } finally {
       if (!silent) setLoading(false)
     }
   }
 
-  const loadDashboard = async () => {
-    setLoading(true)
-    try {
-      await loadProfile({ silent: true })
-
-      const [analyticsResult, recommendationsResult, gamificationResult] = await Promise.allSettled([
-        api.get('/api/analytics/overview'),
-        api.get('/api/analytics/recommendations'),
-        api.get('/api/gamification/me'),
-      ])
-
-      if (analyticsResult.status === 'fulfilled') {
-        const analyticsResponse = analyticsResult.value
-        setAnalytics(analyticsResponse.data.data?.analytics || analyticsResponse.data.analytics)
-      } else {
-        console.warn('Dashboard analytics failed to load', analyticsResult.reason)
-      }
-
-      if (recommendationsResult.status === 'fulfilled') {
-        const recommendationsResponse = recommendationsResult.value
-        setRecommendations(recommendationsResponse.data.data?.recommendations || recommendationsResponse.data.recommendations || [])
-      } else {
-        console.warn('Dashboard recommendations failed to load', recommendationsResult.reason)
-      }
-
-      if (gamificationResult.status === 'fulfilled') {
-        const gamificationResponse = gamificationResult.value
-        setGamification(gamificationResponse.data.data || gamificationResponse.data)
-      } else {
-        console.warn('Dashboard gamification failed to load', gamificationResult.reason)
-      }
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    loadDashboard()
-
-    return () => {
-    }
+    loadProfile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const logout = async () => {
-    try {
-      await api.post('/api/auth/logout')
-    } catch (error) {
-      console.error(error)
-    } finally {
-      dispatch(clearToken())
-      localStorage.removeItem('user')
-      window.location.href = '/'
-    }
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
   }
 
-  const uploadResume = async (event) => {
-    event.preventDefault()
+  function handleDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    const f = e.dataTransfer?.files?.[0]
+    if (f) setResumeFile(f)
+  }
+
+  function openFilePicker() {
+    fileInputRef.current?.click()
+  }
+
+  async function uploadResume(event) {
+    if (event && event.preventDefault) event.preventDefault()
     setResumeError('')
     setResumeMessage('')
 
-    if (!resumeFile) {
+    const file = resumeFile
+    if (!file) {
       setResumeError('Choose a PDF or Word document first.')
       return
     }
 
     const formData = new FormData()
-    formData.append('resume', resumeFile)
+    formData.append('resume', file)
 
     setResumeUploading(true)
+    setUploadProgress(0)
     try {
-      const response = await api.post('/api/profile/resume', formData)
+      const response = await api.post('/api/profile/resume', formData, {
+        headers: { 'Accept': 'application/json' },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            setUploadProgress(pct)
+          }
+        },
+      })
 
-      const resumeData = extractResumeData(response)
-      const uploadedResume = resumeData?.resumeUrl || resumeData?.resume || ''
-      if (!uploadedResume) {
-        throw new Error('Resume upload response did not include a resume URL')
-      }
+      const payload = response?.data?.data || response?.data || {}
+      const uploaded = payload?.resumeUrl || payload?.resume || ''
+      if (!uploaded) throw new Error('No resume URL returned')
 
-      const nextUser = {
-        ...(user || {}),
-        resume: resumeData?.resume || uploadedResume,
-        resumeUrl: resumeData?.resumeUrl || uploadedResume,
-        resumeFileName: resumeData?.resumeFileName || resumeFile?.name || getResumeName(uploadedResume),
-        resumePublicId: resumeData?.resumePublicId || user?.resumePublicId || null,
-        resumeResourceType: resumeData?.resumeResourceType || user?.resumeResourceType || null,
-      }
-
-      setUser(nextUser)
-      dispatch(setAuthUser(nextUser))
-      localStorage.setItem('user', JSON.stringify(nextUser))
-
-      // Pull latest persisted profile to avoid stale client state after upload.
+      // refresh persisted profile and show success
       await loadProfile({ silent: true })
-
-      setResumeMessage('Resume uploaded successfully.')
+      setResumeMessage('Resume uploaded successfully')
       setResumeFile(null)
-      event.target.reset()
-    } catch (error) {
-      setResumeError(error.response?.data?.message || error.message || 'Resume upload failed.')
+      setUploadProgress(100)
+    } catch (err) {
+      console.error('Upload failed', err)
+      setResumeError(err.response?.data?.message || err.message || 'Upload failed')
     } finally {
       setResumeUploading(false)
+      setTimeout(() => setUploadProgress(0), 800)
     }
   }
 
-  const removeResume = async () => {
+  async function removeResume() {
     setResumeError('')
     setResumeMessage('')
-
     try {
-      const response = await api.delete('/api/profile/resume')
-      const nextUser = {
-        ...(user || {}),
-        resume: null,
-        resumeUrl: null,
-        resumeFileName: null,
-        resumePublicId: null,
-        resumeResourceType: null,
-      }
-
-      setUser(nextUser)
-      dispatch(setAuthUser(nextUser))
-      localStorage.setItem('user', JSON.stringify(nextUser))
+      await api.delete('/api/profile/resume')
       await loadProfile({ silent: true })
-      setResumeMessage('Resume removed successfully.')
-    } catch (error) {
-      setResumeError(error.response?.data?.message || 'Resume removal failed.')
+      setResumeMessage('Resume removed')
+    } catch (err) {
+      console.error('Remove failed', err)
+      setResumeError(err.response?.data?.message || 'Remove failed')
     }
   }
 
-  const summaryCards = useMemo(() => {
-    if (!analytics?.summary) return []
-
-    return [
-      { label: 'Quiz Attempts', value: analytics.summary.totalQuizAttempts, description: 'Practice sessions completed', accent: 'bg-blue-500' },
-      { label: 'Coding Attempts', value: analytics.summary.totalCodingAttempts, description: 'Coding submissions evaluated', accent: 'bg-violet-500' },
-      { label: 'Average Accuracy', value: formatPercent(analytics.summary.averageAccuracy), description: 'Across all quiz attempts', accent: 'bg-emerald-500' },
-      { label: 'Best Quiz Score', value: analytics.summary.bestQuizScore, description: 'Highest score achieved', accent: 'bg-amber-500' },
-      { label: 'XP', value: gamification?.progress?.xp || 0, description: 'Gamification points earned', accent: 'bg-sky-500' },
-      { label: 'Streak', value: gamification?.progress?.streak || 0, description: 'Days in a row practicing', accent: 'bg-rose-500' },
-    ]
-  }, [analytics, gamification])
-
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-6 py-8 text-white shadow-xl sm:px-8 lg:px-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm uppercase tracking-[0.25em] text-sky-300">Stage 2 Intelligence</p>
-            <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Analytics-driven interview practice, coding drills, and AI-generated questions.</h1>
-            <p className="mt-3 max-w-2xl text-sm text-slate-300 sm:text-base">
-              Personalized difficulty, performance graphs, weak-area detection, and coding practice powered by the same secure backend.
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-800 to-slate-700 p-6">
+      <div className="w-full max-w-2xl">
+        <div className="p-8 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Your Resume</h2>
+              <p className="text-sm text-slate-300">Upload and manage your resume. Secure, private, and persistent.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { window.location.href = '/' }}
+                className="text-xs text-slate-300 hover:text-white transition"
+              >Home</button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => navigate('/ai')} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow transition hover:bg-slate-100">Generate AI Questions</button>
-            <button onClick={() => navigate('/coding')} className="rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">Open Coding Lab</button>
-            <button onClick={() => navigate('/analytics')} className="rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">View Analytics</button>
-            <button onClick={() => navigate('/growth')} className="rounded-full bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300">Open Growth Hub</button>
-            <button onClick={() => navigate('/interview')} className="rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300">Start Mock Interview</button>
+
+          <div
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            className="relative rounded-2xl p-6 bg-gradient-to-br from-white/3 to-white/2 border border-dashed border-white/20 hover:border-white/40 transition cursor-pointer"
+            onClick={openFilePicker}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+            />
+
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="flex items-center justify-center w-20 h-20 rounded-full bg-white/6 shadow-inner animate-pulse">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-white stroke-current" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 3v12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M8 7l4-4 4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              <div className="text-center">
+                <div className="text-white font-semibold">Drag & drop your resume here</div>
+                <div className="text-xs text-slate-300">or click to browse — PDF, DOC, DOCX</div>
+              </div>
+
+              <div className="w-full">
+                {resumeFile ? (
+                  <div className="flex items-center justify-between gap-4 bg-white/6 px-4 py-3 rounded-md">
+                    <div className="flex items-center gap-3">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M14 2v6h6" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <div className="text-sm text-white">{resumeFile.name}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={uploadResume}
+                        disabled={resumeUploading}
+                        className="px-3 py-1.5 bg-emerald-500 text-white rounded-md text-sm hover:bg-emerald-600 transition disabled:opacity-60"
+                      >{resumeUploading ? 'Uploading...' : 'Upload'}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-300 text-center">No file selected</div>
+                )}
+              </div>
+            </div>
+
+            {/* progress bar */}
+            <div className="absolute left-0 right-0 bottom-0 h-1 bg-white/5 rounded-b-2xl overflow-hidden" style={{ display: uploadProgress > 0 ? 'block' : 'none' }}>
+              <div style={{ width: `${uploadProgress}%` }} className="h-full bg-emerald-400 transition-width duration-200" />
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-slate-300">Saved Resume:</div>
+                <div className="text-sm text-white font-medium">{resumeFileName || 'No resume uploaded'}</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {resumeUrl ? (
+                  <>
+                    <a href={resumeUrl} target="_blank" rel="noreferrer" className="px-4 py-2 bg-white/6 text-white rounded-md hover:bg-white/10 transition text-sm">View Resume</a>
+                    <a href={resumeUrl} download={resumeFileName || 'resume'} className="px-4 py-2 bg-white/6 text-white rounded-md hover:bg-white/10 transition text-sm">Download</a>
+                    <button onClick={removeResume} className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-sm">Remove</button>
+                  </>
+                ) : (
+                  <div className="text-sm text-slate-400">No resume stored on your profile</div>
+                )}
+              </div>
+            </div>
+
+            {resumeMessage ? <div className="text-sm text-emerald-400">{resumeMessage}</div> : null}
+            {resumeError ? <div className="text-sm text-red-400">{resumeError}</div> : null}
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {loading
-          ? Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32" />)
-          : summaryCards.map((card) => <StatsCard key={card.label} {...card} />)}
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <div className="space-y-6">
-          {loading ? (
-            <Skeleton className="h-[24rem]" />
-          ) : (
-            <PerformanceLineChart data={analytics?.quizScores?.map((item, index) => ({ index: index + 1, score: item.score, accuracy: analytics?.quizScores?.length ? Math.round((item.correct / Math.max(item.correct + item.wrong + item.skipped, 1)) * 100) : 0 })) || []} />
-          )}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Weak Areas</h3>
-                <p className="text-sm text-slate-500">Use these topics for the next AI-generated practice set.</p>
-              </div>
-              <Link to="/analytics" className="text-sm font-medium text-blue-600 hover:text-blue-700">See detailed breakdown</Link>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24" />)
-              ) : analytics?.weakAreas?.length ? (
-                analytics.weakAreas.map((area) => (
-                  <div key={area.topic} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <h4 className="font-semibold text-slate-900">{area.topic}</h4>
-                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{formatPercent(area.accuracy)}</span>
-                    </div>
-                    <div className="mt-2 text-sm text-slate-600">Correct: {area.correct} · Wrong: {area.wrong} · Skipped: {area.skipped}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Complete a few assessments to surface weak areas here.</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <aside className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Profile</h3>
-            {loading ? (
-              <div className="mt-4 space-y-3">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-5 w-44" />
-                <Skeleton className="h-5 w-40" />
-              </div>
-            ) : (
-              <div className="mt-4 space-y-4 text-sm text-slate-600">
-                <div className="space-y-2">
-                  <p><span className="font-semibold text-slate-900">Name:</span> {user?.name}</p>
-                  <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
-                  <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
-                  <p><span className="font-semibold text-slate-900">Resume:</span> {resumeUrl ? 'Uploaded' : 'Not uploaded'}</p>
-                  {resumeUrl ? (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saved File</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <a
-                          href={resumeUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                        >
-                          View Resume
-                        </a>
-                        <a
-                          href={resumeUrl}
-                          download={resumeFileName || 'resume'}
-                          className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                          Download Resume
-                        </a>
-                        <span className="text-xs text-slate-500">{resumeFileName || 'resume'}</span>
-                        <button
-                          type="button"
-                          onClick={removeResume}
-                          className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <form onSubmit={uploadResume} className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                  <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Upload Resume</label>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
-                      className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="submit"
-                      disabled={resumeUploading}
-                      className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {resumeUploading ? 'Uploading...' : 'Upload Resume'}
-                    </button>
-                    {resumeFile ? <span className="text-xs text-slate-500">Selected: {resumeFile.name}</span> : null}
-                  </div>
-
-                  {resumeMessage ? <p className="text-sm font-medium text-emerald-600">{resumeMessage}</p> : null}
-                  {resumeError ? <p className="text-sm font-medium text-red-600">{resumeError}</p> : null}
-                </form>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Recommendations</h3>
-            <div className="mt-4 space-y-3">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20" />)
-              ) : recommendations.length ? (
-                recommendations.map((recommendation) => (
-                  <div key={recommendation.id || recommendation.topic} className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                    <div className="font-semibold text-slate-900">{recommendation.topic || recommendation.area}</div>
-                    <div className="mt-1">{recommendation.recommendation}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">Recommendations will appear after a few completed assessments.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Quick Actions</h3>
-            <div className="mt-4 grid gap-3">
-              <button onClick={() => navigate(`/quiz?module=aptitude&count=36&refresh=${Date.now()}`)} className="rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-semibold text-white">Practice Aptitude</button>
+      </div>
+    </div>
+  )
+}
               <button onClick={() => navigate(`/quiz?module=reasoning&count=36&refresh=${Date.now()}`)} className="rounded-xl bg-slate-800 px-4 py-3 text-left text-sm font-semibold text-white">Practice Reasoning</button>
               <button onClick={() => navigate(`/quiz?module=verbal&count=36&refresh=${Date.now()}`)} className="rounded-xl bg-slate-700 px-4 py-3 text-left text-sm font-semibold text-white">Practice Verbal</button>
               <button onClick={() => navigate('/coding')} className="rounded-xl bg-blue-600 px-4 py-3 text-left text-sm font-semibold text-white">Start Coding Assessment</button>
