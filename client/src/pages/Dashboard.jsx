@@ -141,9 +141,7 @@ export default function Dashboard() {
 
     setResumeUploading(true)
     try {
-      const response = await api.post('/api/profile/resume', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const response = await api.post('/api/profile/resume', formData)
 
       const resumeData = extractResumeData(response)
       const uploadedResume = resumeData?.resumeUrl || resumeData?.resume || ''
