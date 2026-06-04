@@ -1,276 +1,195 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/api'
-import { useDispatch } from 'react-redux'
-import { setUser as setAuthUser } from '../store/store'
+import Skeleton from '../components/Skeleton'
+import StatsCard from '../components/StatsCard'
+import PerformanceLineChart from '../components/PerformanceLineChart'
 
-function getResumeName(resumePath) {
-  if (!resumePath) return ''
-  try {
-    const url = new URL(resumePath)
-    return url.pathname.split('/').filter(Boolean).pop() || ''
-  } catch (e) {
-    return String(resumePath).split('/').filter(Boolean).pop() || ''
-  }
+function formatPercent(value) {
+  return `${Number(value || 0)}%`
 }
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
+  const [recommendations, setRecommendations] = useState([])
+  const [gamification, setGamification] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [resumeFile, setResumeFile] = useState(null)
-  const [resumeUploading, setResumeUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [resumeMessage, setResumeMessage] = useState('')
-  const [resumeError, setResumeError] = useState('')
-  const dispatch = useDispatch()
-  const fileInputRef = useRef(null)
+  const navigate = useNavigate()
 
-  const resumeUrl = user?.resumeUrl || user?.resume || ''
-  const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
-
-  async function loadProfile({ silent = false } = {}) {
-    if (!silent) setLoading(true)
+  const loadDashboard = async () => {
+    setLoading(true)
     try {
-      const resp = await api.get('/api/profile')
-      const data = resp?.data?.data?.user || resp?.data?.user || resp?.data || resp?.data?.profile || null
-      setUser(data)
-      dispatch(setAuthUser(data))
-      if (data) localStorage.setItem('user', JSON.stringify(data))
-      return data
-    } catch (err) {
-      console.error('Failed to load profile', err)
-      return null
+      const [profileResponse, analyticsResponse, recommendationsResponse, gamificationResponse] = await Promise.all([
+        api.get('/api/auth/me'),
+        api.get('/api/analytics/overview'),
+        api.get('/api/analytics/recommendations'),
+        api.get('/api/gamification/me'),
+      ])
+
+      const profileData = profileResponse.data.data || profileResponse.data
+      const analyticsData = analyticsResponse.data.data?.analytics || analyticsResponse.data.analytics
+      const recommendationsData = recommendationsResponse.data.data?.recommendations || recommendationsResponse.data.recommendations || []
+      const gamificationData = gamificationResponse.data.data || gamificationResponse.data
+
+      setUser(profileData)
+      setAnalytics(analyticsData)
+      setRecommendations(recommendationsData)
+      setGamification(gamificationData)
+    } catch (error) {
+      console.error(error)
     } finally {
-      if (!silent) setLoading(false)
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadProfile()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadDashboard()
+    const intervalId = setInterval(loadDashboard, 30000)
+    return () => clearInterval(intervalId)
   }, [])
 
-  function handleDragOver(e) {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-
-  function handleDrop(e) {
-    e.preventDefault()
-    e.stopPropagation()
-    const f = e.dataTransfer?.files?.[0]
-    if (f) setResumeFile(f)
-  }
-
-  function openFilePicker() {
-    fileInputRef.current?.click()
-  }
-
-  async function uploadResume(event) {
-    if (event && event.preventDefault) event.preventDefault()
-    setResumeError('')
-    setResumeMessage('')
-
-    const file = resumeFile
-    if (!file) {
-      setResumeError('Choose a PDF or Word document first.')
-      return
-    }
-
-    const formData = new FormData()
-    formData.append('resume', file)
-
-    setResumeUploading(true)
-    setUploadProgress(0)
+  const logout = async () => {
     try {
-      const response = await api.post('/api/profile/resume', formData, {
-        headers: { 'Accept': 'application/json' },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            setUploadProgress(pct)
-          }
-        },
-      })
-
-      const payload = response?.data?.data || response?.data || {}
-      const uploaded = payload?.resumeUrl || payload?.resume || ''
-      if (!uploaded) throw new Error('No resume URL returned')
-
-      // refresh persisted profile and show success
-      await loadProfile({ silent: true })
-      setResumeMessage('Resume uploaded successfully')
-      setResumeFile(null)
-      setUploadProgress(100)
-    } catch (err) {
-      console.error('Upload failed', err)
-      setResumeError(err.response?.data?.message || err.message || 'Upload failed')
+      await api.post('/api/auth/logout')
+    } catch (error) {
+      console.error(error)
     } finally {
-      setResumeUploading(false)
-      setTimeout(() => setUploadProgress(0), 800)
+      localStorage.removeItem('token')
+      window.location.href = '/'
     }
   }
 
-  async function removeResume() {
-    setResumeError('')
-    setResumeMessage('')
-    try {
-      await api.delete('/api/profile/resume')
-      await loadProfile({ silent: true })
-      setResumeMessage('Resume removed')
-    } catch (err) {
-      console.error('Remove failed', err)
-      setResumeError(err.response?.data?.message || 'Remove failed')
-    }
-  }
+  const summaryCards = useMemo(() => {
+    if (!analytics?.summary) return []
+
+    return [
+      { label: 'Quiz Attempts', value: analytics.summary.totalQuizAttempts, description: 'Practice sessions completed', accent: 'bg-blue-500' },
+      { label: 'Coding Attempts', value: analytics.summary.totalCodingAttempts, description: 'Coding submissions evaluated', accent: 'bg-violet-500' },
+      { label: 'Average Accuracy', value: formatPercent(analytics.summary.averageAccuracy), description: 'Across all quiz attempts', accent: 'bg-emerald-500' },
+      { label: 'Best Quiz Score', value: analytics.summary.bestQuizScore, description: 'Highest score achieved', accent: 'bg-amber-500' },
+      { label: 'XP', value: gamification?.progress?.xp || 0, description: 'Gamification points earned', accent: 'bg-sky-500' },
+      { label: 'Streak', value: gamification?.progress?.streak || 0, description: 'Days in a row practicing', accent: 'bg-rose-500' },
+    ]
+  }, [analytics, gamification])
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.16),_transparent_30%),#030712] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-4xl">
-        <div className="rounded-[2.5rem] border border-white/10 bg-slate-950/70 backdrop-blur-2xl shadow-[0_40px_120px_rgba(15,23,42,0.7)] overflow-hidden">
-          <div className="relative overflow-hidden px-8 pb-10 pt-12 sm:px-12 sm:pt-16">
-            <div className="absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-cyan-500/20 via-transparent to-transparent blur-3xl" />
-            <div className="relative mx-auto max-w-2xl text-center">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-300 shadow-sm shadow-cyan-500/10">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-300">
-                  <path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M16 6l-4-4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 2v11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Resume Vault
-              </span>
-              <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Premium resume upload</h1>
-              <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">Securely upload your resume, keep it persisted across refreshes, and manage your latest version with a polished drag-and-drop upload experience.</p>
-            </div>
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-6 py-8 text-white shadow-xl sm:px-8 lg:px-10">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-sm uppercase tracking-[0.25em] text-sky-300">Stage 2 Intelligence</p>
+            <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Analytics-driven interview practice, coding drills, and AI-generated questions.</h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-300 sm:text-base">
+              Personalized difficulty, performance graphs, weak-area detection, and coding practice powered by the same secure backend.
+            </p>
           </div>
+          <div className="flex flex-wrap gap-3">
+            <button onClick={() => navigate('/ai')} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow transition hover:bg-slate-100">Generate AI Questions</button>
+            <button onClick={() => navigate('/coding')} className="rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">Open Coding Lab</button>
+            <button onClick={() => navigate('/analytics')} className="rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">View Analytics</button>
+            <button onClick={() => navigate('/growth')} className="rounded-full bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300">Open Growth Hub</button>
+            <button onClick={() => navigate('/interview')} className="rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300">Start Mock Interview</button>
+          </div>
+        </div>
+      </section>
 
-          <div className="border-t border-white/10 px-6 pb-10 sm:px-10">
-            <div className="mx-auto max-w-3xl rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:p-8">
-              <div className="flex flex-col gap-6 sm:gap-8">
-                <div className="flex items-start gap-4 rounded-3xl bg-gradient-to-r from-slate-900/90 via-slate-950/80 to-slate-900/90 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.35)] sm:p-6">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-cyan-500/15 text-cyan-300 shadow-xl shadow-cyan-500/15">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-current">
-                      <path d="M16 16V12H8v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M12 12V4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M8 8l4-4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M20 18.5a2.5 2.5 0 01-2.5 2.5H6.5A2.5 2.5 0 014 18.5V7.5A2.5 2.5 0 016.5 5h3.743" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">Drag & drop your resume</h2>
-                    <p className="mt-1 text-sm text-slate-400">Support for PDF, DOC, and DOCX files. Upload your latest resume and keep it available across sessions.</p>
-                  </div>
-                </div>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {loading
+          ? Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32" />)
+          : summaryCards.map((card) => <StatsCard key={card.label} {...card} />)}
+      </section>
 
-                <div
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onClick={openFilePicker}
-                  className="group relative overflow-hidden rounded-[1.75rem] border border-dashed border-slate-500/40 bg-gradient-to-br from-slate-900/90 to-slate-950/90 p-8 text-center transition duration-300 hover:border-cyan-400/70 hover:bg-slate-900/95 cursor-pointer"
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    className="hidden"
-                    onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-                  />
+      <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          {loading ? (
+            <Skeleton className="h-[24rem]" />
+          ) : (
+            <PerformanceLineChart data={analytics?.quizScores?.map((item, index) => ({ index: index + 1, score: item.score, accuracy: analytics?.quizScores?.length ? Math.round((item.correct / Math.max(item.correct + item.wrong + item.skipped, 1)) * 100) : 0 })) || []} />
+          )}
 
-                  <div className="pointer-events-none flex flex-col items-center justify-center gap-4">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/5 text-cyan-300 shadow-[0_24px_60px_rgba(6,182,212,0.15)] transition duration-300 group-hover:scale-105">
-                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-current">
-                        <path d="M7 16h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M12 12v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M12 2l4 4h-3v6h-2V6H8l4-4z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-semibold text-white">Drop your file or browse</p>
-                      <p className="text-sm text-slate-400">Tap to select from your device. Upload progress displays in real time.</p>
-                    </div>
-                    <div className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm text-white shadow-sm shadow-cyan-500/10 transition duration-300 group-hover:bg-cyan-500/15">
-                      Browse files
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
-                  <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 shadow-inner shadow-slate-950/20">
-                    <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Saved resume</p>
-                    <p className="mt-3 text-base font-medium text-white">{resumeFileName || 'No resume uploaded'}</p>
-                  </div>
-
-                  <div className="flex flex-wrap justify-end gap-3">
-                    {resumeUrl ? (
-                      <>
-                        <a href={resumeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-300/50 hover:bg-cyan-500/10">
-                          <span>View Resume</span>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-300">
-                            <path d="M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                            <path d="M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </a>
-                        <a href={resumeUrl} download={resumeFileName || 'resume'} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-300/50 hover:bg-cyan-500/10">
-                          <span>Download</span>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-300">
-                            <path d="M12 4v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                            <path d="M8 14l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </a>
-                        <button
-                          onClick={removeResume}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-                        >
-                          <span>Remove</span>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                            <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                            <path d="M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                          </svg>
-                        </button>
-                      </>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-slate-400">No saved resume yet</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/70 p-4">
-                  <div className="flex items-center justify-between gap-4 text-sm text-slate-300">
-                    <span>{resumeFile ? `Selected: ${resumeFile.name}` : 'Ready for upload'}</span>
-                    <span>{resumeUploading ? `${uploadProgress}% uploaded` : `${resumeUrl ? 'Resume stored securely' : 'Choose a file to upload'}`}</span>
-                  </div>
-
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 transition-all duration-300" style={{ width: `${Math.max(uploadProgress, resumeUploading ? uploadProgress : 0)}%` }} />
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-300/50 hover:bg-cyan-500/10"
-                  >Choose file</button>
-                  <button
-                    type="button"
-                    onClick={uploadResume}
-                    disabled={!resumeFile || resumeUploading}
-                    className="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >{resumeUploading ? 'Uploading...' : 'Upload resume'}</button>
-                  <button
-                    type="button"
-                    onClick={() => setResumeFile(null)}
-                    disabled={!resumeFile || resumeUploading}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-red-300/50 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >Clear selection</button>
-                </div>
-
-                {resumeMessage ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{resumeMessage}</div> : null}
-                {resumeError ? <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{resumeError}</div> : null}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Weak Areas</h3>
+                <p className="text-sm text-slate-500">Use these topics for the next AI-generated practice set.</p>
               </div>
+              <Link to="/analytics" className="text-sm font-medium text-blue-600 hover:text-blue-700">See detailed breakdown</Link>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24" />)
+              ) : analytics?.weakAreas?.length ? (
+                analytics.weakAreas.map((area) => (
+                  <div key={area.topic} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="font-semibold text-slate-900">{area.topic}</h4>
+                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{formatPercent(area.accuracy)}</span>
+                    </div>
+                    <div className="mt-2 text-sm text-slate-600">Correct: {area.correct} · Wrong: {area.wrong} · Skipped: {area.skipped}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Complete a few assessments to surface weak areas here.</div>
+              )}
             </div>
           </div>
         </div>
-      </div>
+
+        <aside className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">Profile</h3>
+            {loading ? (
+              <div className="mt-4 space-y-3">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-44" />
+                <Skeleton className="h-5 w-40" />
+              </div>
+            ) : (
+              <div className="mt-4 space-y-2 text-sm text-slate-600">
+                <p><span className="font-semibold text-slate-900">Name:</span> {user?.name}</p>
+                <p><span className="font-semibold text-slate-900">Email:</span> {user?.email}</p>
+                <p><span className="font-semibold text-slate-900">Role:</span> {user?.role}</p>
+                <p><span className="font-semibold text-slate-900">Resume:</span> {user?.resume ? 'Uploaded' : 'Not uploaded'}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">Recommendations</h3>
+            <div className="mt-4 space-y-3">
+              {loading ? (
+                Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20" />)
+              ) : recommendations.length ? (
+                recommendations.map((recommendation) => (
+                  <div key={recommendation.id || recommendation.topic} className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                    <div className="font-semibold text-slate-900">{recommendation.topic || recommendation.area}</div>
+                    <div className="mt-1">{recommendation.recommendation}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">Recommendations will appear after a few completed assessments.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">Quick Actions</h3>
+            <div className="mt-4 grid gap-3">
+              <button onClick={() => navigate('/quiz?module=aptitude&count=10')} className="rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-semibold text-white">Practice Aptitude</button>
+              <button onClick={() => navigate('/quiz?module=reasoning&count=10')} className="rounded-xl bg-slate-800 px-4 py-3 text-left text-sm font-semibold text-white">Practice Reasoning</button>
+              <button onClick={() => navigate('/quiz?module=verbal&count=10')} className="rounded-xl bg-slate-700 px-4 py-3 text-left text-sm font-semibold text-white">Practice Verbal</button>
+              <button onClick={() => navigate('/coding')} className="rounded-xl bg-blue-600 px-4 py-3 text-left text-sm font-semibold text-white">Start Coding Assessment</button>
+              <button onClick={() => navigate('/ai')} className="rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold text-white">Generate AI Questions</button>
+              <button onClick={() => navigate('/interview')} className="rounded-xl bg-indigo-600 px-4 py-3 text-left text-sm font-semibold text-white">Start Mock Interview</button>
+              <button onClick={() => navigate('/growth')} className="rounded-xl bg-sky-600 px-4 py-3 text-left text-sm font-semibold text-white">Open Growth Hub</button>
+              {user?.role === 'admin' && <button onClick={() => navigate('/admin')} className="rounded-xl bg-slate-950 px-4 py-3 text-left text-sm font-semibold text-white">Open Admin Dashboard</button>}
+              <button onClick={logout} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm font-semibold text-red-700">Logout</button>
+            </div>
+          </div>
+        </aside>
+      </section>
     </div>
   )
 }
