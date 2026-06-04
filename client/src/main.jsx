@@ -6,13 +6,16 @@ import './index.css'
 import { Provider } from 'react-redux'
 import store from './store/store'
 import { LanguageProvider } from './context/LanguageContext'
+import { ToastProvider } from './components/ToastProvider'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Provider store={store}>
       <LanguageProvider>
         <HashRouter>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </HashRouter>
       </LanguageProvider>
     </Provider>

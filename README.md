@@ -58,3 +58,27 @@ that value at runtime, so the same image works in Railway and locally.
 
 Use `deploy/railway/environment.production.example` as the starting point for
 the backend service variables.
+
+## Resume analyzer
+
+The project includes a premium resume analyzer workflow with upload, AI review, history, and PDF report export.
+
+- Upload resumes from `client/src/pages/Resume.jsx`
+- Generate analysis via `POST /api/resume/analyze`
+- Review saved results at `/resume/analytics`
+- Download a premium multi-page PDF report from the dashboard
+
+Ensure Cloudinary resume storage is configured with:
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+## Testing
+
+Run the backend server smoke tests from the repository root:
+
+```bash
+npm test
+```
+
+This starts a temporary server and verifies the API health endpoints and readiness checks.

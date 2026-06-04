@@ -4,6 +4,8 @@ import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import StatsCard from '../components/StatsCard'
 import PerformanceLineChart from '../components/PerformanceLineChart'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 
 function formatPercent(value) {
   return `${Number(value || 0)}%`
@@ -16,6 +18,7 @@ export default function Dashboard() {
   const [gamification, setGamification] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const toast = useToast()
 
   const loadDashboard = async () => {
     setLoading(true)
@@ -38,6 +41,7 @@ export default function Dashboard() {
       setGamification(gamificationData)
     } catch (error) {
       console.error(error)
+      toast.error('Unable to load dashboard metrics. Please refresh the page.')
     } finally {
       setLoading(false)
     }
@@ -74,7 +78,12 @@ export default function Dashboard() {
   }, [analytics, gamification])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loading}
+        title="Loading dashboard"
+        subtitle="Refreshing your performance summary and recommendations."
+      />
       <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-6 py-8 text-white shadow-xl sm:px-8 lg:px-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">

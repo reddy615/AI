@@ -45,6 +45,10 @@ New stage 4 routes:
 - `GET /api/admin/interviews`
 - `GET /api/admin/reports`
 - `PUT /api/profile/preferences`
+- `POST /api/profile/resume` — upload resume (requires auth)
+- `DELETE /api/profile/resume` — delete uploaded resume (requires auth)
+- `POST /api/resume/analyze` — analyze a resume file or URL (requires auth)
+- `GET /api/resume/history` — fetch analysis history for the authenticated user
 
 Recommended local production stack:
 
@@ -53,6 +57,17 @@ docker compose -f ../docker-compose.prod.yml up --build
 ```
 
 The FastAPI recommendation service is in `../ml-service/` and can be run independently with Uvicorn.
+
+## Testing
+
+Run the server smoke tests from the `server` folder:
+
+```bash
+cd server
+npm test
+```
+
+The tests validate `/health`, `/ready`, `/`, 404 handling, and unauthorized resume API requests.
 
 ## Railway deployment notes
 

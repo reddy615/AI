@@ -3,6 +3,8 @@ import Editor, { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 
 // Force Monaco to load from local bundle files instead of external CDN.
 loader.config({ monaco })
@@ -35,6 +37,7 @@ export default function CodingAssessment() {
   const [sourceCode, setSourceCode] = useState('// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const toast = useToast()
   const [submission, setSubmission] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
   const [editorReady, setEditorReady] = useState(false)
@@ -63,6 +66,7 @@ export default function CodingAssessment() {
       setLeaderboard(leaderboardList)
     } catch (error) {
       console.error(error)
+      toast.error('Unable to load challenges. Please refresh the page.')
     } finally {
       setLoading(false)
     }
@@ -183,6 +187,7 @@ export default function CodingAssessment() {
     } catch (error) {
       console.error(error)
       const message = error.response?.data?.message || error.response?.data?.error || error.message || 'Unable to run code right now.'
+      toast.error(message)
       setRunError(message)
     } finally {
       setSubmitting(false)
@@ -202,7 +207,12 @@ export default function CodingAssessment() {
   }, [selectedChallengeId, challenge])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loading || submitting}
+        title={submitting ? 'Running Code' : 'Loading Coding Lab'}
+        subtitle={submitting ? 'Executing your solution and updating the leaderboard.' : 'Preparing the coding assessment environment.'}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-violet-600">Coding Lab</p>

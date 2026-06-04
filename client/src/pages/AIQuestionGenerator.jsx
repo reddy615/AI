@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 
 export default function AIQuestionGenerator() {
   const [form, setForm] = useState({ module: 'technical', difficulty: 'medium', count: 5, role: 'Software Engineer', experienceLevel: 'mid', weakAreas: '' })
@@ -8,6 +10,7 @@ export default function AIQuestionGenerator() {
   const [recentQuestions, setRecentQuestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const toast = useToast()
 
   const loadRecent = async () => {
     try {
@@ -15,6 +18,7 @@ export default function AIQuestionGenerator() {
       setRecentQuestions(response.data.data?.questions || response.data.questions || [])
     } catch (error) {
       console.error(error)
+      toast.error('Unable to load recent questions.')
     }
   }
 
@@ -47,6 +51,7 @@ export default function AIQuestionGenerator() {
       await loadRecent()
     } catch (error) {
       console.error(error)
+      toast.error('AI generation failed. Please try a different prompt.')
     } finally {
       setLoading(false)
     }
@@ -56,16 +61,23 @@ export default function AIQuestionGenerator() {
     try {
       await navigator.clipboard.writeText(question.question || question.prompt)
       setSaving(true)
+      toast.success('Question copied to clipboard')
       setTimeout(() => setSaving(false), 1000)
     } catch (error) {
       console.error(error)
+      toast.error('Unable to copy question. Please try again.')
     }
   }
 
   const visibleQuestions = useMemo(() => questions.length ? questions : recentQuestions.slice(0, 5), [questions, recentQuestions])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loading}
+        title="Generating questions"
+        subtitle="Creating your personalized interview set."
+      />
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-emerald-600">AI Generation</p>
         <h1 className="text-3xl font-bold text-slate-900">Generate Personalized Interview Questions</h1>

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 import { useLanguage } from '../context/LanguageContext'
 
 const tabs = ['overview', 'users', 'questions', 'interviews', 'reports']
@@ -11,6 +13,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const { t } = useLanguage()
+  const toast = useToast()
 
   const loadData = async () => {
     setLoading(true)
@@ -38,10 +41,13 @@ export default function AdminDashboard() {
       const failures = [summaryResponse, usersResponse, questionsResponse, interviewsResponse, reportsResponse].filter((item) => item.status === 'rejected')
       if (failures.length === 5) {
         setError('No admin data could be loaded.')
+        toast.error('Unable to load admin dashboard. Please try again later.')
       }
     } catch (requestError) {
       console.error(requestError)
-      setError(requestError.response?.data?.message || 'Unable to load admin data')
+      const message = requestError.response?.data?.message || 'Unable to load admin data'
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -66,9 +72,12 @@ export default function AdminDashboard() {
   const updateUser = async (userId, payload) => {
     try {
       await api.patch(`/api/admin/users/${userId}`, payload)
+      toast.success('User settings updated successfully')
       await loadData()
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to update user')
+      const message = requestError.response?.data?.message || 'Unable to update user'
+      setError(message)
+      toast.error(message)
     }
   }
 
@@ -238,7 +247,12 @@ export default function AdminDashboard() {
   )
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loading}
+        title="Loading admin dashboard"
+        subtitle="Gathering platform and user analytics for administrators."
+      />
       <section className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#020617_0%,#0f172a_55%,#1f2937_100%)] px-6 py-8 text-white shadow-2xl sm:px-8 lg:px-10">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">

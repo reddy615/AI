@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/api'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 import { useDispatch } from 'react-redux'
 import { setUser as setAuthUser } from '../store/store'
 
@@ -30,9 +32,12 @@ export default function Resume() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [resumeMessage, setResumeMessage] = useState('')
   const [resumeError, setResumeError] = useState('')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState(null)
   const [isDragActive, setIsDragActive] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const dispatch = useDispatch()
+  const toast = useToast()
   const fileInputRef = useRef(null)
   const navigate = useNavigate()
 
@@ -50,6 +55,7 @@ export default function Resume() {
       return data
     } catch (err) {
       console.error('Failed to load profile', err)
+      toast.error('Failed to load profile. Please refresh the page.')
       return null
     } finally {
       if (!silent) setLoading(false)
@@ -118,6 +124,7 @@ export default function Resume() {
 
       // refresh persisted profile and show success
       await loadProfile({ silent: true })
+      toast.success('Resume uploaded successfully')
       setResumeMessage('Resume uploaded successfully')
       setResumeFile(null)
       setUploadProgress(100)
@@ -125,7 +132,9 @@ export default function Resume() {
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (err) {
       console.error('Upload failed', err)
-      setResumeError(err.response?.data?.message || err.message || 'Upload failed')
+      const message = err.response?.data?.message || err.message || 'Upload failed'
+      toast.error(message)
+      setResumeError(message)
     } finally {
       setResumeUploading(false)
       setTimeout(() => setUploadProgress(0), 800)
@@ -145,8 +154,39 @@ export default function Resume() {
     }
   }
 
+  async function analyzeResumeAction() {
+    setResumeError('')
+    setResumeMessage('')
+    setAnalysisResult(null)
+    if (!resumeUrl) {
+      setResumeError('No resume uploaded to analyze')
+      return
+    }
+    try {
+      setAnalysisLoading(true)
+      const resp = await api.post('/api/resume/analyze', { }, { params: { url: resumeUrl } })
+      // API expects file upload; however if resume already stored on server profile, server will accept download.
+      // For now expect result in resp.data.data
+      const data = resp?.data?.data || resp?.data
+      setAnalysisResult(data)
+    } catch (err) {
+      console.error('Analyze failed', err)
+      const message = err.response?.data?.message || err.message || 'Analysis failed'
+      toast.error(message)
+      setResumeError(message)
+    } finally {
+      setAnalysisLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 animate-fade-in">
+      <LoadingOverlay
+        visible={loading || resumeUploading || analysisLoading}
+        title={resumeUploading ? 'Uploading Resume' : analysisLoading ? 'Analyzing Resume' : 'Preparing Resume Center'}
+        subtitle={resumeUploading ? 'Uploading your file with secure progress tracking.' : analysisLoading ? 'Generating AI insights and premium scorecards.' : 'Loading your resume workspace.'}
+        progress={resumeUploading ? uploadProgress : undefined}
+      />
       {/* Animated background gradient */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
@@ -171,7 +211,7 @@ export default function Resume() {
           </div>
 
           {/* Main Card */}
-          <div className="rounded-3xl border border-slate-700/50 bg-slate-900/50 backdrop-blur-xl shadow-2xl overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <div className="rounded-3xl border border-slate-700/50 bg-slate-900/50 backdrop-blur-xl shadow-2xl overflow-hidden animate-fade-in premium-card" style={{ animationDelay: '0.2s' }}>
             {/* Success Animation */}
             {showSuccess && (
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 animate-pulse pointer-events-none rounded-3xl z-50" />
@@ -232,7 +272,7 @@ export default function Resume() {
                     </p>
                     <button
                       type="button"
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-2 text-sm font-semibold text-white hover:from-cyan-600 hover:to-blue-600 transition-all duration-300"
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-2 text-sm font-semibold text-white hover:from-cyan-600 hover:to-blue-600 transition-all duration-300 active:scale-95"
                     >
                       Browse Files
                     </button>
@@ -398,9 +438,60 @@ export default function Resume() {
                         </svg>
                         Remove
                       </button>
+                      <button
+                        onClick={() => navigate('/resume/analytics')}
+                        className="flex-1 rounded-lg bg-gradient-to-r from-indigo-600 to-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:from-indigo-700 hover:to-pink-700 flex items-center justify-center gap-2"
+                      >
+                        Open Analytics
+                      </button>
+                      <button
+                        onClick={analyzeResumeAction}
+                        disabled={analysisLoading}
+                        className="flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:from-indigo-600 hover:to-violet-600 flex items-center justify-center gap-2"
+                      >
+                        {analysisLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Analyzing...
+                          </div>
+                        ) : (
+                          'Analyze Resume'
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
+                {/* Analysis Result */}
+                {analysisResult && (
+                  <div className="mt-6 rounded-xl border border-slate-700 bg-slate-800/30 p-6">
+                    <h4 className="text-lg font-bold text-white mb-3">AI Resume Analysis</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="col-span-2">
+                        <pre className="whitespace-pre-wrap text-sm text-slate-200">{JSON.stringify(analysisResult.analysis || analysisResult, null, 2)}</pre>
+                      </div>
+                      <div>
+                        <div className="mb-4">
+                          <p className="text-sm text-slate-400">ATS Score</p>
+                          <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
+                            <div className="h-3 bg-emerald-400" style={{ width: `${(analysisResult.analysis?.ATS || analysisResult.analysis?.ats || 0)}%` }} />
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <p className="text-sm text-slate-400">Resume Quality</p>
+                          <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
+                            <div className="h-3 bg-cyan-400" style={{ width: `${(analysisResult.analysis?.resume_quality || 0)}%` }} />
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <p className="text-sm text-slate-400">Interview Readiness</p>
+                          <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
+                            <div className="h-3 bg-rose-400" style={{ width: `${(analysisResult.analysis?.interview_readiness || 0)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               ) : (
                 <div className="border-t border-slate-700 pt-8">
                   <div className="text-center py-12 px-6 rounded-xl border border-dashed border-slate-700/50 bg-slate-800/20">

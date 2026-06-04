@@ -72,7 +72,7 @@ export default function Result() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-sm premium-card">
       <h2 className="text-xl font-bold">Result</h2>
       <p className="mt-2">Score: <strong>{attempt.score}</strong></p>
       <p>Correct: {attempt.correctCount} • Wrong: {attempt.wrongCount} • Skipped: {attempt.skippedCount}</p>

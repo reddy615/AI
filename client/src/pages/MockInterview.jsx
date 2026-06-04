@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 import InterviewSidebar from '../components/InterviewSidebar'
 import WebcamMonitor from '../components/WebcamMonitor'
 import FeedbackPanel from '../components/FeedbackPanel'
@@ -53,6 +55,7 @@ export default function MockInterview() {
   const [endedSession, setEndedSession] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [assistantNote, setAssistantNote] = useState('Start an interview to hear the AI interviewer ask your first question.')
+  const toast = useToast()
 
   const videoRef = useRef(null)
   const cameraStreamRef = useRef(null)
@@ -175,6 +178,7 @@ export default function MockInterview() {
       setModelStatus(nextState.message || (nextState.loaded ? 'vision models ready' : 'heuristic vision mode'))
     } catch (error) {
       console.warn('Face models not available, falling back to heuristic camera metrics.', error)
+      toast.error('Face analysis is unavailable. Continuing in fallback mode.')
       modelsReadyRef.current = false
       setModelState(getFaceApiModelState())
       setModelStatus('heuristic vision mode')
@@ -455,6 +459,7 @@ export default function MockInterview() {
         startCameraLoop()
       } catch (cameraError) {
         console.warn('Camera/microphone unavailable, continuing in text mode.', cameraError)
+        toast.error('Camera or microphone unavailable. You can continue in text mode.')
         setModelStatus('camera unavailable - text mode')
         setAudioStatus('Text mode available')
       }
@@ -463,6 +468,7 @@ export default function MockInterview() {
       elapsedIntervalRef.current = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - interviewStartedAtRef.current) / 1000)), 1000)
     } catch (error) {
       console.error('[mock-interview:start] failed', error)
+      toast.error('Unable to start the mock interview. Please try again.')
       setAssistantNote('Failed to start the interview session.')
     } finally {
       setLoadingSession(false)
@@ -530,7 +536,12 @@ export default function MockInterview() {
   const combinedTranscript = useMemo(() => [liveTranscript, transcript, draftTranscript].filter(Boolean).join('\n').trim(), [draftTranscript, liveTranscript, transcript])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loadingSession || loadingModels}
+        title={loadingSession ? 'Starting interview' : 'Loading interview models'}
+        subtitle={loadingSession ? 'Preparing your live AI mock interview session.' : 'Loading webcam and feedback models.'}
+      />
       <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-8 text-white shadow-xl sm:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -548,7 +559,7 @@ export default function MockInterview() {
       </section>
 
       {!session ? (
-        <form onSubmit={startInterview} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
+        <form onSubmit={startInterview} className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2 premium-card">
           <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
             Interview Type
             <select name="interviewType" value={form.interviewType} onChange={(event) => setForm((current) => ({ ...current, interviewType: event.target.value }))} className="rounded-xl border border-slate-300 px-4 py-3">
@@ -590,7 +601,7 @@ export default function MockInterview() {
               feedback={cameraFeedback}
             />
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm premium-card">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-500">AI Interviewer</div>
@@ -633,7 +644,7 @@ export default function MockInterview() {
       )}
 
       {sessionEnded && endedSession ? (
-        <section className="grid gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
+        <section className="grid gap-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2 premium-card">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Session Summary</h3>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

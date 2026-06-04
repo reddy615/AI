@@ -3,12 +3,15 @@ import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import StatsCard from '../components/StatsCard'
 import PerformanceLineChart from '../components/PerformanceLineChart'
+import LoadingOverlay from '../components/LoadingOverlay'
+import { useToast } from '../components/ToastProvider'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function AnalyticsDashboard() {
   const [analytics, setAnalytics] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
+  const toast = useToast()
 
   const loadData = async () => {
     setLoading(true)
@@ -21,6 +24,7 @@ export default function AnalyticsDashboard() {
       setLeaderboard(leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || [])
     } catch (error) {
       console.error(error)
+      toast.error('Unable to load analytics data. Please try again later.')
     } finally {
       setLoading(false)
     }
@@ -38,7 +42,12 @@ export default function AnalyticsDashboard() {
   const scoreTrends = analytics?.quizScores?.map((item, index) => ({ index: index + 1, score: item.score, accuracy: Math.round((item.correct / Math.max(item.correct + item.wrong + item.skipped, 1)) * 100) })) || []
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <LoadingOverlay
+        visible={loading}
+        title="Loading analytics"
+        subtitle="Fetching performance metrics and leaderboard details."
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-blue-600">Analytics</p>
@@ -59,8 +68,10 @@ export default function AnalyticsDashboard() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <PerformanceLineChart data={scoreTrends} />
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-[0_25px_80px_rgba(15,23,42,0.08)] premium-card">
+          <PerformanceLineChart data={scoreTrends} />
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-[0_25px_80px_rgba(15,23,42,0.08)] premium-card">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-slate-900">Module Breakdown</h3>
             <p className="text-sm text-slate-500">Aggregate scores by module.</p>

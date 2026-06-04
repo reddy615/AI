@@ -1,0 +1,160 @@
+.resume-analytics-report {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.report-export-root {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.report-header {
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.report-title {
+  color: #111827;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.report-subtitle {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.report-section {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report-executive {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(99, 102, 241, 0.24);
+}
+
+.section-heading {
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.section-copy {
+  color: #475569;
+  line-height: 1.75;
+}
+
+.report-card {
+  background: #ffffff;
+}
+
+.report-card-inner {
+  background: #f8fafc;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.report-chart-grid,
+.report-card-grid {
+  gap: 24px;
+}
+
+.report-chart,
+.report-heatmap,
+.report-matrix {
+  min-height: 320px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.report-chart canvas,
+.report-heatmap canvas,
+.report-matrix canvas,
+.report-chart img,
+.report-heatmap img,
+.report-matrix img {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  object-fit: contain;
+}
+
+.report-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  font-size: 12px;
+  color: #64748b;
+}
+
+.report-footer .report-footer-brand,
+.report-footer .report-footer-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-footer .report-footer-page::after {
+  content: counter(page);
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .resume-analytics-report,
+  .report-export-root,
+  .report-section,
+  .report-card-inner,
+  .report-card,
+  .report-chart,
+  .report-heatmap,
+  .report-matrix {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .report-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .report-title,
+  .report-subtitle,
+  .section-heading,
+  .section-copy {
+    color: #111827 !important;
+  }
+
+  .report-footer {
+    position: relative !important;
+    width: 100% !important;
+  }
+
+  .report-footer .report-footer-page::after {
+    content: "Page " counter(page);
+  }
+}

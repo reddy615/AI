@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import { useDispatch } from 'react-redux'
 import { setUser } from './store/store'
 import Navigation from './components/Navigation'
@@ -8,6 +9,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Resume from './pages/Resume'
+import ResumeAnalytics from './pages/ResumeAnalytics'
 import Quiz from './pages/Quiz'
 import Result from './pages/Result'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
@@ -18,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import GrowthDashboard from './pages/GrowthDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import LanguageSwitcher from './components/LanguageSwitcher'
+import PageTransition from './components/PageTransition'
 import { useLanguage } from './context/LanguageContext'
 import api from './api/api'
 
@@ -25,6 +28,7 @@ export default function App() {
   const { t } = useLanguage()
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const [user, setUserState] = useState(null)
   const [loading, setLoading] = useState(true)
   const token = localStorage.getItem('token')
@@ -75,21 +79,24 @@ export default function App() {
     <div className="min-h-screen bg-slate-950">
       <Navigation user={user} onLogout={handleLogout} />
       <div className="pt-20">
-        <Routes>
-          <Route path="/" element={!token ? <Home /> : <Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={!token ? <Login /> : <Navigate to="/dashboard" replace />} />
-          <Route path="/register" element={!token ? <Register /> : <Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/resume" element={<ProtectedRoute><Resume /></ProtectedRoute>} />
-          <Route path="/growth" element={<ProtectedRoute><GrowthDashboard /></ProtectedRoute>} />
-          <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard /></ProtectedRoute>} />
-          <Route path="/quiz" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
-          <Route path="/result/:id" element={<ProtectedRoute><Result /></ProtectedRoute>} />
-          <Route path="/coding" element={<ProtectedRoute><CodingAssessment /></ProtectedRoute>} />
-          <Route path="/ai" element={<ProtectedRoute><AIQuestionGenerator /></ProtectedRoute>} />
-          <Route path="/interview" element={<ProtectedRoute><MockInterview /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={!token ? <PageTransition><Home /></PageTransition> : <Navigate to="/dashboard" replace />} />
+            <Route path="/login" element={!token ? <PageTransition><Login /></PageTransition> : <Navigate to="/dashboard" replace />} />
+            <Route path="/register" element={!token ? <PageTransition><Register /></PageTransition> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<ProtectedRoute><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
+            <Route path="/resume" element={<ProtectedRoute><PageTransition><Resume /></PageTransition></ProtectedRoute>} />
+            <Route path="/resume/analytics" element={<ProtectedRoute><PageTransition><ResumeAnalytics /></PageTransition></ProtectedRoute>} />
+            <Route path="/growth" element={<ProtectedRoute><PageTransition><GrowthDashboard /></PageTransition></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute><PageTransition><AnalyticsDashboard /></PageTransition></ProtectedRoute>} />
+            <Route path="/quiz" element={<ProtectedRoute><PageTransition><Quiz /></PageTransition></ProtectedRoute>} />
+            <Route path="/result/:id" element={<ProtectedRoute><PageTransition><Result /></PageTransition></ProtectedRoute>} />
+            <Route path="/coding" element={<ProtectedRoute><PageTransition><CodingAssessment /></PageTransition></ProtectedRoute>} />
+            <Route path="/ai" element={<ProtectedRoute><PageTransition><AIQuestionGenerator /></PageTransition></ProtectedRoute>} />
+            <Route path="/interview" element={<ProtectedRoute><PageTransition><MockInterview /></PageTransition></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />
+          </Routes>
+        </AnimatePresence>
       </div>
     </div>
   )

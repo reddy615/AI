@@ -22,6 +22,7 @@ const mockInterviewRoutes = require('./routes/mockInterviews');
 const recommendationRoutes = require('./routes/recommendations');
 const gamificationRoutes = require('./routes/gamification');
 const adminRoutes = require('./routes/admin');
+const resumeRoutes = require('./routes/resume');
 
 client.collectDefaultMetrics({ prefix: 'ai_interview_' });
 const httpRequestDuration = new client.Histogram({
@@ -128,6 +129,7 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/mock-interviews', mockInterviewRoutes);
+app.use('/api/resume', resumeRoutes);
 
 // Serve frontend static assets when available (single-service deployment)
 const clientDistPath = path.join(__dirname, '../../client/dist');
