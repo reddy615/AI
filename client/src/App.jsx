@@ -3,6 +3,7 @@ import { Routes, Route, Link, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import Resume from './pages/Resume'
 import Quiz from './pages/Quiz'
 import Result from './pages/Result'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
@@ -40,7 +41,7 @@ export default function App() {
             <Link to="/ai" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.ai')}</Link>
             <Link to="/coding" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.coding')}</Link>
             <Link to="/interview" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.interview')}</Link>
-            <Link to="/dashboard#resume" className="rounded-full px-3 py-2 transition hover:bg-slate-100">Resume</Link>
+            <Link to="/resume" className="rounded-full px-3 py-2 transition hover:bg-slate-100">Resume</Link>
             {user?.role === 'admin' ? <Link to="/admin" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.admin')}</Link> : null}
           </div>
           <div className="flex items-center gap-3">
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
+          <Route path="/resume" element={<ProtectedRoute><Resume/></ProtectedRoute>} />
           <Route path="/growth" element={<ProtectedRoute><GrowthDashboard /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard/></ProtectedRoute>} />
           <Route path="/coding" element={<ProtectedRoute><CodingAssessment/></ProtectedRoute>} />

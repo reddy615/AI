@@ -138,7 +138,7 @@ export default function Dashboard() {
         </div>
 
         <aside className="space-y-6">
-          <div id="resume" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-900">Profile</h3>
             {loading ? (
               <div className="mt-4 space-y-3">
