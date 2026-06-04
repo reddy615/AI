@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Menu, X, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -7,6 +7,7 @@ export default function Navigation({ user, onLogout }) {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,9 +26,31 @@ export default function Navigation({ user, onLogout }) {
   const navItems = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Features', href: '/#features' },
+    { label: 'Resume', href: '/resume' },
     { label: 'Mock Interview', href: '/interview' },
     { label: 'Coding Lab', href: '/coding' },
   ]
+
+  const isActiveNavItem = (href) => {
+    if (href === '/resume') {
+      return location.pathname.startsWith('/resume')
+    }
+    if (href === '/#features') {
+      return location.pathname === '/' && location.hash === '#features'
+    }
+    return location.pathname === href
+  }
+
+  const navLinkClass = (item) =>
+    `text-sm font-medium transition ${
+      isActiveNavItem(item.href)
+        ? 'text-cyan-400 font-semibold'
+        : 'text-slate-300 hover:text-cyan-400'
+    }`
+
+  const handleNavClick = () => {
+    setIsOpen(false)
+  }
 
   return (
     <>
@@ -61,14 +84,14 @@ export default function Navigation({ user, onLogout }) {
             {/* Desktop Menu */}
             <div className="hidden items-center gap-8 md:flex">
               {navItems.map((item) => (
-                <motion.a
+                <motion.div
                   key={item.href}
-                  href={item.href}
-                  className="text-sm font-medium text-slate-300 transition hover:text-cyan-400"
                   whileHover={{ y: -2 }}
                 >
-                  {item.label}
-                </motion.a>
+                  <Link to={item.href} className={navLinkClass(item)}>
+                    {item.label}
+                  </Link>
+                </motion.div>
               ))}
             </div>
 
@@ -136,15 +159,22 @@ export default function Navigation({ user, onLogout }) {
           >
             <div className="space-y-2 px-4 py-6">
               {navItems.map((item) => (
-                <motion.a
+                <motion.div
                   key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className="block rounded-lg px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-cyan-400"
                   whileHover={{ x: 4 }}
                 >
-                  {item.label}
-                </motion.a>
+                  <Link
+                    to={item.href}
+                    onClick={handleNavClick}
+                    className={`block rounded-lg px-4 py-3 text-sm font-medium transition ${
+                      isActiveNavItem(item.href)
+                        ? 'bg-slate-900 text-cyan-400 font-semibold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-cyan-400'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                </motion.div>
               ))}
               <div className="border-t border-slate-800 pt-4 mt-4">
                 {user ? (
