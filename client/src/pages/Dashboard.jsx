@@ -127,28 +127,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.16),_transparent_30%),#030712] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-4xl">
         <div className="rounded-[2.5rem] border border-white/10 bg-slate-950/70 backdrop-blur-2xl shadow-[0_40px_120px_rgba(15,23,42,0.7)] overflow-hidden">
-          {/* Restored compact overview (old dashboard) */}
-          <div className="px-6 pt-8 pb-4 sm:px-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">Welcome back{user?.name ? `, ${user.name}` : ''}</h2>
-                <p className="mt-1 text-sm text-slate-300">Quick links and recent activity</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <a href="/coding" className="rounded-full px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">Coding Lab</a>
-                <a href="/interview" className="rounded-full px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">Interview</a>
-                <a href="/analytics" className="rounded-full px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800">Analytics</a>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border border-white/5 bg-white/3 p-4 text-sm text-slate-200">Assessments: <span className="font-semibold text-white">{user?.assessments?.length || 0}</span></div>
-              <div className="rounded-lg border border-white/5 bg-white/3 p-4 text-sm text-slate-200">Interviews: <span className="font-semibold text-white">{user?.interviews?.length || 0}</span></div>
-              <div className="rounded-lg border border-white/5 bg-white/3 p-4 text-sm text-slate-200">Saved Resume: <span className="font-semibold text-white">{resumeFileName || 'None'}</span></div>
-            </div>
-          </div>
-
-          <div id="resume" className="relative overflow-hidden px-8 pb-10 pt-4 sm:px-12 sm:pt-8">
+          <div className="relative overflow-hidden px-8 pb-10 pt-12 sm:px-12 sm:pt-16">
             <div className="absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-cyan-500/20 via-transparent to-transparent blur-3xl" />
             <div className="relative mx-auto max-w-2xl text-center">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-300 shadow-sm shadow-cyan-500/10">
