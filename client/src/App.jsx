@@ -1,5 +1,9 @@
-import React from 'react'
-import { Routes, Route, Link, Navigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { setAuthUser } from './store/store'
+import Navigation from './components/Navigation'
+import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -15,49 +19,81 @@ import GrowthDashboard from './pages/GrowthDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import { useLanguage } from './context/LanguageContext'
+import api from './api/api'
 
 export default function App() {
   const { t } = useLanguage()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
   const token = localStorage.getItem('token')
-  const user = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || 'null')
-    } catch (error) {
-      return null
+
+  useEffect(() => {
+    const loadUser = async () => {
+      if (token) {
+        try {
+          const response = await api.get('/api/profile')
+          setUser(response.data)
+          dispatch(setAuthUser(response.data))
+        } catch (error) {
+          console.error('Error loading user:', error)
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+        }
+      }
+      setLoading(false)
     }
-  })()
+    loadUser()
+  }, [token, dispatch])
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    setUser(null)
+    dispatch(setAuthUser(null))
+    navigate('/')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 p-3 mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white animate-spin">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.3"/>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="30 100" strokeDashoffset="0"/>
+            </svg>
+          </div>
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_35%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] text-slate-900">
-      <nav className="sticky top-0 z-30 border-b border-white/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <Link to="/dashboard" className="text-lg font-black tracking-tight text-slate-950">
-            {t('appName')}
-          </Link>
-          <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-600">
-            <Link to="/dashboard" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.dashboard')}</Link>
-            <Link to="/growth" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.growth')}</Link>
-            <Link to="/analytics" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.analytics')}</Link>
-            <Link to="/ai" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.ai')}</Link>
-            <Link to="/coding" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.coding')}</Link>
-            <Link to="/interview" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.interview')}</Link>
-            <Link to="/resume" className="rounded-full px-3 py-2 transition hover:bg-slate-100">Resume</Link>
-            {user?.role === 'admin' ? <Link to="/admin" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.admin')}</Link> : null}
-          </div>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <Link to="/dashboard" className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm">{user?.name || 'Account'}</Link>
-          </div>
-        </div>
-      </nav>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-950">
+      <Navigation user={user} onLogout={handleLogout} />
+      <div className="pt-20">
         <Routes>
-          <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : <Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
-          <Route path="/resume" element={<ProtectedRoute><Resume/></ProtectedRoute>} />
+          <Route path="/" element={!token ? <Home /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={!token ? <Login /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/register" element={!token ? <Register /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/resume" element={<ProtectedRoute><Resume /></ProtectedRoute>} />
           <Route path="/growth" element={<ProtectedRoute><GrowthDashboard /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard /></ProtectedRoute>} />
+          <Route path="/quiz" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
+          <Route path="/result/:id" element={<ProtectedRoute><Result /></ProtectedRoute>} />
+          <Route path="/coding" element={<ProtectedRoute><CodingAssessment /></ProtectedRoute>} />
+          <Route path="/ai" element={<ProtectedRoute><AIQuestionGenerator /></ProtectedRoute>} />
+          <Route path="/interview" element={<ProtectedRoute><MockInterview /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        </Routes>
+      </div>
+    </div>
+  )
+}
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard/></ProtectedRoute>} />
           <Route path="/coding" element={<ProtectedRoute><CodingAssessment/></ProtectedRoute>} />
           <Route path="/ai" element={<ProtectedRoute><AIQuestionGenerator/></ProtectedRoute>} />
