@@ -383,8 +383,9 @@ export default function Resume() {
 
               {/* Current Resume Section */}
               {resumeUrl ? (
-                <div className="space-y-6 border-t border-slate-700 pt-8">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-3">
+                <>
+                  <div className="space-y-6 border-t border-slate-700 pt-8">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-emerald-500/20 flex items-center justify-center">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-emerald-400">
                         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -492,6 +493,7 @@ export default function Resume() {
                     </div>
                   </div>
                 )}
+                </>
               ) : (
                 <div className="border-t border-slate-700 pt-8">
                   <div className="text-center py-12 px-6 rounded-xl border border-dashed border-slate-700/50 bg-slate-800/20">
