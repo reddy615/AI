@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/api'
 import LoadingOverlay from '../components/LoadingOverlay'
 import { useToast } from '../components/ToastProvider'
@@ -43,6 +44,7 @@ export default function Resume() {
 
   const resumeUrl = user?.resumeUrl || user?.resume || ''
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
+  const hasResume = Boolean(resumeUrl)
 
   async function loadProfile({ silent = false } = {}) {
     if (!silent) setLoading(true)
@@ -147,6 +149,8 @@ export default function Resume() {
     try {
       await api.delete('/api/profile/resume')
       await loadProfile({ silent: true })
+      setResumeFile(null)
+      setAnalysisResult(null)
       setResumeMessage('Resume removed')
     } catch (err) {
       console.error('Remove failed', err)
@@ -219,171 +223,160 @@ export default function Resume() {
 
             <div className="p-8 sm:p-12">
               {/* Upload Area */}
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  Upload Resume
-                </h2>
-
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={openFilePicker}
-                  className={`group relative overflow-hidden rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ${
-                    isDragActive
-                      ? 'border-cyan-400 bg-cyan-500/10'
-                      : 'border-slate-600 bg-slate-800/30 hover:border-cyan-400/50 hover:bg-slate-800/50'
-                  }`}
+              <AnimatePresence mode="wait">
+              {!hasResume ? (
+                <motion.div
+                  key="upload-section"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -16 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    className="hidden"
-                    onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-                  />
-
-                  <div className="pointer-events-none">
-                    <div className="flex justify-center mb-4">
-                      <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
-                        isDragActive
-                          ? 'bg-cyan-500/30 scale-110'
-                          : 'bg-slate-700/50 group-hover:scale-105'
-                      }`}>
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-300">
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
+                      Upload Resume
+                    </h2>
+
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={openFilePicker}
+                      className={
+                        'group relative overflow-hidden rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-300 ' +
+                        (isDragActive
+                          ? 'border-cyan-400 bg-cyan-500/10'
+                          : 'border-slate-600 bg-slate-800/30 hover:border-cyan-400/50 hover:bg-slate-800/50')
+                      }
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="hidden"
+                        onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                      />
+
+                      <div className="pointer-events-none">
+                        <div className="flex justify-center mb-4">
+                          <div className={
+                            'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ' +
+                            (isDragActive
+                              ? 'bg-cyan-500/30 scale-110'
+                              : 'bg-slate-700/50 group-hover:scale-105')
+                          }>
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-300">
+                              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <p className="text-white font-semibold text-lg mb-1">
+                          {isDragActive ? 'Drop your resume here' : 'Drag and drop your resume'}
+                        </p>
+                        <p className="text-slate-400 text-sm">
+                          PDF, DOC, or DOCX files. Maximum 10MB.
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-2 text-sm font-semibold text-white hover:from-cyan-600 hover:to-blue-600 transition-all duration-300 active:scale-95"
+                        >
+                          Browse Files
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-white font-semibold text-lg mb-1">
-                      {isDragActive ? 'Drop your resume here' : 'Drag and drop your resume'}
-                    </p>
-                    <p className="text-slate-400 text-sm">
-                      PDF, DOC, or DOCX files. Maximum 10MB.
-                    </p>
+
+                    {resumeFile && (
+                      <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded bg-red-500/20 flex items-center justify-center">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-400">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <polyline points="14 2 14 10 22 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white truncate">{resumeFile.name}</p>
+                              <p className="text-xs text-slate-400">{formatFileSize(resumeFile.size)}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setResumeFile(null)}
+                            className="text-slate-400 hover:text-slate-200 transition-colors"
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-current">
+                              <path d="M18 6l-12 12m0-12l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {resumeUploading && (
+                    <div className="mb-8 animate-fade-in">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-slate-300">Uploading...</p>
+                        <p className="text-sm font-semibold text-cyan-400">{uploadProgress}%</p>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                          style={{ width: uploadProgress + '%' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
                     <button
                       type="button"
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-2 text-sm font-semibold text-white hover:from-cyan-600 hover:to-blue-600 transition-all duration-300 active:scale-95"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-lg border border-slate-600 bg-slate-800/50 px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:border-slate-500 hover:bg-slate-700/50"
                     >
-                      Browse Files
+                      Choose File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={uploadResume}
+                      disabled={!resumeFile || resumeUploading}
+                      className={
+                        'rounded-lg px-4 py-3 text-sm font-semibold transition-all duration-300 col-span-1 sm:col-span-2 ' +
+                        (resumeFile && !resumeUploading
+                          ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
+                          : 'bg-slate-700 text-slate-400 cursor-not-allowed')
+                      }
+                    >
+                      {resumeUploading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Uploading...
+                        </div>
+                      ) : (
+                        'Upload Resume'
+                      )}
                     </button>
                   </div>
-                </div>
 
-                {resumeFile && (
-                  <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded bg-red-500/20 flex items-center justify-center">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-400">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            <polyline points="14 2 14 10 22 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-white truncate">{resumeFile.name}</p>
-                          <p className="text-xs text-slate-400">{formatFileSize(resumeFile.size)}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setResumeFile(null)}
-                        className="text-slate-400 hover:text-slate-200 transition-colors"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-current">
-                          <path d="M18 6l-12 12m0-12l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              {resumeUploading && (
-                <div className="mb-8 animate-fade-in">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-slate-300">Uploading...</p>
-                    <p className="text-sm font-semibold text-cyan-400">{uploadProgress}%</p>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-lg border border-slate-600 bg-slate-800/50 px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:border-slate-500 hover:bg-slate-700/50"
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="current-resume"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -16 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  Choose File
-                </button>
-                <button
-                  type="button"
-                  onClick={uploadResume}
-                  disabled={!resumeFile || resumeUploading}
-                  className={`rounded-lg px-4 py-3 text-sm font-semibold transition-all duration-300 col-span-1 sm:col-span-2 ${
-                    resumeFile && !resumeUploading
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
-                      : 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  {resumeUploading ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Uploading...
-                    </div>
-                  ) : (
-                    'Upload Resume'
-                  )}
-                </button>
-              </div>
-
-              {/* Messages */}
-              {resumeMessage && (
-                <div className="mb-8 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 animate-fade-in">
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm text-emerald-200">{resumeMessage}</p>
-                  </div>
-                </div>
-              )}
-
-              {resumeError && (
-                <div className="mb-8 p-4 rounded-lg border border-red-500/30 bg-red-500/10 animate-fade-in">
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                        <path d="M18 6l-12 12m0-12l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm text-red-200">{resumeError}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Current Resume Section */}
-              {resumeUrl ? (
-                <>
                   <div className="space-y-6 border-t border-slate-700 pt-8">
                     <h3 className="text-lg font-bold text-white flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-emerald-500/20 flex items-center justify-center">
@@ -474,45 +467,57 @@ export default function Resume() {
                         <div className="mb-4">
                           <p className="text-sm text-slate-400">ATS Score</p>
                           <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
-                            <div className="h-3 bg-emerald-400" style={{ width: `${(analysisResult.analysis?.ATS || analysisResult.analysis?.ats || 0)}%` }} />
+                            <div className="h-3 bg-emerald-400" style={{ width: (analysisResult.analysis?.ATS || analysisResult.analysis?.ats || 0) + '%' }} />
                           </div>
                         </div>
                         <div className="mb-4">
                           <p className="text-sm text-slate-400">Resume Quality</p>
                           <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
-                            <div className="h-3 bg-cyan-400" style={{ width: `${(analysisResult.analysis?.resume_quality || 0)}%` }} />
+                            <div className="h-3 bg-cyan-400" style={{ width: (analysisResult.analysis?.resume_quality || 0) + '%' }} />
                           </div>
                         </div>
                         <div className="mb-4">
                           <p className="text-sm text-slate-400">Interview Readiness</p>
                           <div className="w-full h-3 bg-slate-700 rounded overflow-hidden mt-1">
-                            <div className="h-3 bg-rose-400" style={{ width: `${(analysisResult.analysis?.interview_readiness || 0)}%` }} />
+                            <div className="h-3 bg-rose-400" style={{ width: (analysisResult.analysis?.interview_readiness || 0) + '%' }} />
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-                </>
-              ) : (
-                <div className="border-t border-slate-700 pt-8">
-                  <div className="text-center py-12 px-6 rounded-xl border border-dashed border-slate-700/50 bg-slate-800/20">
-                    <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-500">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="14 2 14 10 22 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <p className="text-slate-400 text-sm">No resume uploaded yet</p>
-                    <p className="text-slate-500 text-xs mt-1">Upload your first resume to get started</p>
+              </motion.div>
+            )}
+            </AnimatePresence>
+
+            {resumeMessage && (
+              <div className="mb-8 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                      <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
+                  <p className="text-sm text-emerald-200">{resumeMessage}</p>
                 </div>
-              )}
+              </div>
+            )}
+
+            {resumeError && (
+              <div className="mb-8 p-4 rounded-lg border border-red-500/30 bg-red-500/10 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                      <path d="M18 6l-12 12m0-12l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <p className="text-sm text-red-200">{resumeError}</p>
+                </div>
+              </div>
+            )}
             </div>
           </div>
         </div>
-      </div>
-
       <style>{`
         @keyframes fadeIn {
           from {
@@ -528,6 +533,8 @@ export default function Resume() {
           animation: fadeIn 0.5s ease-out forwards;
         }
       `}</style>
+      </div>
+
     </div>
   )
 }
