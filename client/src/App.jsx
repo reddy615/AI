@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { setAuthUser } from './store/store'
+import { setUser } from './store/store'
 import Navigation from './components/Navigation'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -25,7 +25,7 @@ export default function App() {
   const { t } = useLanguage()
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const [user, setUser] = useState(null)
+  const [user, setUserState] = useState(null)
   const [loading, setLoading] = useState(true)
   const token = localStorage.getItem('token')
 
@@ -34,8 +34,8 @@ export default function App() {
       if (token) {
         try {
           const response = await api.get('/api/profile')
-          setUser(response.data)
-          dispatch(setAuthUser(response.data))
+          setUserState(response.data)
+          dispatch(setUser(response.data))
         } catch (error) {
           console.error('Error loading user:', error)
           localStorage.removeItem('token')
@@ -50,8 +50,8 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    setUser(null)
-    dispatch(setAuthUser(null))
+    setUserState(null)
+    dispatch(setUser(null))
     navigate('/')
   }
 
@@ -89,18 +89,6 @@ export default function App() {
           <Route path="/ai" element={<ProtectedRoute><AIQuestionGenerator /></ProtectedRoute>} />
           <Route path="/interview" element={<ProtectedRoute><MockInterview /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-        </Routes>
-      </div>
-    </div>
-  )
-}
-          <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard/></ProtectedRoute>} />
-          <Route path="/coding" element={<ProtectedRoute><CodingAssessment/></ProtectedRoute>} />
-          <Route path="/ai" element={<ProtectedRoute><AIQuestionGenerator/></ProtectedRoute>} />
-          <Route path="/interview" element={<ProtectedRoute><MockInterview/></ProtectedRoute>} />
-          <Route path="/quiz" element={<ProtectedRoute><Quiz/></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/result/:id" element={<ProtectedRoute><Result/></ProtectedRoute>} />
         </Routes>
       </div>
     </div>
