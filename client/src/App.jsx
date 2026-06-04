@@ -40,6 +40,7 @@ export default function App() {
             <Link to="/ai" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.ai')}</Link>
             <Link to="/coding" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.coding')}</Link>
             <Link to="/interview" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.interview')}</Link>
+            <Link to={{ pathname: '/dashboard', hash: '#resume' }} className="rounded-full px-3 py-2 transition hover:bg-slate-100">Resume</Link>
             {user?.role === 'admin' ? <Link to="/admin" className="rounded-full px-3 py-2 transition hover:bg-slate-100">{t('nav.admin')}</Link> : null}
           </div>
           <div className="flex items-center gap-3">
