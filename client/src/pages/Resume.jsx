@@ -46,14 +46,6 @@ export default function Resume() {
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
   const hasResume = Boolean(resumeUrl)
 
-  function mimeToExt(mime) {
-    if (!mime) return '.pdf'
-    if (mime.includes('pdf')) return '.pdf'
-    if (mime.includes('word') || mime === 'application/msword') return '.doc'
-    if (mime.includes('officedocument')) return '.docx'
-    return '.pdf'
-  }
-
   async function loadProfile({ silent = false } = {}) {
     if (!silent) setLoading(true)
     try {
@@ -178,32 +170,7 @@ export default function Resume() {
     }
   }
 
-  async function downloadResume() {
-    if (!resumeUrl) return
-    try {
-      setResumeError('')
-      const resp = await api.get(resumeUrl, { responseType: 'blob' })
-      const blob = resp.data
-      const url = window.URL.createObjectURL(blob)
-      let filename = resumeFileName || 'Resume'
-      // Ensure filename has extension
-      if (!/\.[a-zA-Z0-9]+$/.test(filename)) {
-        const ct = resp.headers['content-type'] || user?.resumeMimeType
-        const ext = mimeToExt(ct)
-        filename = filename + (ext.startsWith('.') ? ext : '.' + ext)
-      }
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Download failed', err)
-      setResumeError('Failed to download resume')
-    }
-  }
+  // Use backend endpoints for view/download to ensure correct headers and CORS handling.
 
   async function analyzeResumeAction() {
     setResumeError('')
@@ -447,7 +414,7 @@ export default function Resume() {
                     </div>
                     <div className="flex gap-3 pt-4 border-t border-slate-700">
                       <a
-                        href={resumeUrl}
+                        href={`/api/profile/resume/file`}
                         target="_blank"
                         rel="noreferrer"
                         className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 flex items-center justify-center gap-2"
@@ -458,9 +425,9 @@ export default function Resume() {
                         </svg>
                         View
                       </a>
-                      <button
-                        type="button"
-                        onClick={downloadResume}
+                      <a
+                        href={`/api/profile/resume/file?download=1`}
+                        download={resumeFileName || 'Resume.pdf'}
                         className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 flex items-center justify-center gap-2"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-400">
@@ -469,7 +436,7 @@ export default function Resume() {
                           <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                         Download
-                      </button>
+                      </a>
                       <button
                         onClick={removeResume}
                         className="flex-1 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-300 hover:border-red-500/50 hover:bg-red-500/20 flex items-center justify-center gap-2"

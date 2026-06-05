@@ -22,5 +22,6 @@ router.get('/', auth, getProfile);
 router.put('/preferences', auth, updatePreferences);
 router.post('/resume', auth, upload.single('resume'), uploadResume);
 router.delete('/resume', auth, deleteResume);
+router.get('/resume/file', auth, require('../controllers/profileController').serveResumeFile);
 
 module.exports = router;

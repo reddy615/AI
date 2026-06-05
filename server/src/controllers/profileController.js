@@ -156,3 +156,54 @@ exports.deleteResume = asyncHandler(async (req, res) => {
 
   return res.apiSuccess({ resume: null }, 'Resume removed');
 });
+
+exports.serveResumeFile = asyncHandler(async (req, res) => {
+  const user = await findDatabaseUser(req, { includePassword: true });
+  if (!user) {
+    return sendError(res, 'Database unavailable', 503);
+  }
+
+  const resumeUrl = user.resumeUrl || user.resume || null;
+  if (!resumeUrl) {
+    return sendError(res, 'No resume available', 404);
+  }
+
+  // Determine whether this is a forced download
+  const forceDownload = String(req.query.download || '').toLowerCase() === '1' || String(req.query.download || '').toLowerCase() === 'true';
+
+  // Fetch the remote resource and stream it back with correct headers
+  const fetchUrl = resumeUrl;
+  const remoteResp = await fetch(fetchUrl);
+  if (!remoteResp.ok) {
+    return sendError(res, 'Failed to fetch resume file', 502);
+  }
+
+  const contentType = remoteResp.headers.get('content-type') || user.resumeMimeType || 'application/octet-stream';
+
+  // Ensure filename has sensible fallback and extension
+  let filename = user.resumeFileName || 'Resume';
+  try {
+    if (!/\.[a-zA-Z0-9]+$/.test(filename)) {
+      const ext = (contentType && contentType.includes('pdf')) ? '.pdf' : '';
+      filename = filename + ext;
+    }
+  } catch (e) {}
+
+  const dispositionType = forceDownload ? 'attachment' : 'inline';
+  const safeFilename = filename.replace(/"/g, '');
+  const disposition = `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`;
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', disposition);
+  res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+
+  // Stream the response body to the client
+  const body = remoteResp.body;
+  if (body && typeof body.pipe === 'function') {
+    return body.pipe(res);
+  }
+
+  // Fallback: buffer and send
+  const buffer = await remoteResp.arrayBuffer();
+  res.send(Buffer.from(buffer));
+});
