@@ -40,6 +40,7 @@ function serializeUserProfile(user) {
     resume: resumeUrl,
     resumeUrl,
     resumeFileName: getResumeFileName(plainUser),
+    resumeMimeType: plainUser.resumeMimeType || null,
     resumePublicId: plainUser.resumePublicId || null,
     resumeResourceType: plainUser.resumeResourceType || null,
   };

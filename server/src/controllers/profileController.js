@@ -61,6 +61,7 @@ exports.uploadResume = asyncHandler(async (req, res) => {
   }
 
   const originalName = req.file.originalname || 'resume';
+  const mimeType = req.file.mimetype || null;
 
   if (!hasCloudinaryConfig()) {
     return sendError(res, 'Cloudinary is not configured for resume uploads', 500);
@@ -79,9 +80,11 @@ exports.uploadResume = asyncHandler(async (req, res) => {
     uploadResult = await uploadBuffer(req.file.buffer, {
       folder: 'ai-interview/resumes',
       resource_type: 'raw',
-      public_id: `resume-${String(user._id || user.id)}-${Date.now()}`,
-      use_filename: false,
+      // Allow Cloudinary to preserve the original filename. We do not set a custom public_id
+      // so Cloudinary will emit a public_id we can store for later deletion.
+      use_filename: true,
       unique_filename: false,
+      preserve_original_filename: true,
       overwrite: true,
       access_mode: 'public',
     });
@@ -110,10 +113,11 @@ exports.uploadResume = asyncHandler(async (req, res) => {
   user.resumePublicId = uploadResult.public_id;
   user.resumeResourceType = uploadResult.resource_type || 'raw';
   user.resumeFileName = originalName;
+  user.resumeMimeType = mimeType;
 
   await user.save();
 
-  const savedUser = await User.findById(user._id).select('name email resume resumeUrl resumeFileName resumePublicId resumeResourceType');
+  const savedUser = await User.findById(user._id).select('name email resume resumeUrl resumeFileName resumePublicId resumeResourceType resumeMimeType');
   const serialized = serializeUserProfile(savedUser || user);
 
   return res.apiSuccess(
@@ -147,6 +151,7 @@ exports.deleteResume = asyncHandler(async (req, res) => {
   user.resumePublicId = null;
   user.resumeFileName = null;
   user.resumeResourceType = null;
+  user.resumeMimeType = null;
   await user.save();
 
   return res.apiSuccess({ resume: null }, 'Resume removed');

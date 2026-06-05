@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   resume: { type: String },
   resumeUrl: { type: String },
+  resumeMimeType: { type: String },
   resumeFileName: { type: String },
   resumePublicId: { type: String },
   resumeResourceType: { type: String, default: 'raw' },
