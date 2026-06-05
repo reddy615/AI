@@ -25,6 +25,63 @@ function formatFileSize(bytes) {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
+const RESUME_FILE_ENDPOINT = '/api/profile/resume/file'
+
+function decodeHeaderValue(value) {
+  try {
+    return decodeURIComponent(value)
+  } catch (error) {
+    return value
+  }
+}
+
+function getContentDispositionFilename(disposition) {
+  if (!disposition) return ''
+
+  const encodedMatch = disposition.match(/filename\*\s*=\s*(?:(?:UTF-8|utf-8)'')?([^;]+)/i)
+  if (encodedMatch?.[1]) {
+    const value = encodedMatch[1].trim().replace(/^"(.*)"$/, '$1')
+    return decodeHeaderValue(value)
+  }
+
+  const plainMatch = disposition.match(/filename\s*=\s*("(?:[^"\\]|\\.)*"|[^;]+)/i)
+  if (!plainMatch?.[1]) return ''
+
+  const value = plainMatch[1].trim()
+  if (value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1).replace(/\\"/g, '"')
+  }
+
+  return value
+}
+
+function sanitizeFileName(fileName) {
+  const clean = String(fileName || '').trim().replace(/[\\/:*?"<>|\u0000-\u001F]/g, '-')
+  return clean || 'Resume'
+}
+
+function ensureFileNameExtension(fileName, contentType) {
+  const safeName = sanitizeFileName(fileName)
+  if (/\.[a-z0-9]{2,5}$/i.test(safeName)) return safeName
+
+  const type = String(contentType || '').toLowerCase()
+  if (type.includes('pdf')) return `${safeName}.pdf`
+  if (type.includes('officedocument.wordprocessingml.document')) return `${safeName}.docx`
+  if (type.includes('msword')) return `${safeName}.doc`
+
+  return safeName
+}
+
+async function readJsonMessageFromBlob(blob) {
+  try {
+    const text = await blob.text()
+    const parsed = JSON.parse(text)
+    return parsed?.message || parsed?.error || ''
+  } catch (error) {
+    return ''
+  }
+}
+
 export default function Resume() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,14 +94,19 @@ export default function Resume() {
   const [analysisResult, setAnalysisResult] = useState(null)
   const [isDragActive, setIsDragActive] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [resumeDeliveryAction, setResumeDeliveryAction] = useState(null)
   const dispatch = useDispatch()
   const toast = useToast()
   const fileInputRef = useRef(null)
+  const objectUrlsRef = useRef(new Set())
   const navigate = useNavigate()
 
   const resumeUrl = user?.resumeUrl || user?.resume || ''
   const resumeFileName = user?.resumeFileName || getResumeName(resumeUrl)
   const hasResume = Boolean(resumeUrl)
+  const isViewingResume = resumeDeliveryAction === 'view'
+  const isDownloadingResume = resumeDeliveryAction === 'download'
+  const isResumeDelivering = Boolean(resumeDeliveryAction)
 
   async function loadProfile({ silent = false } = {}) {
     if (!silent) setLoading(true)
@@ -68,6 +130,21 @@ export default function Resume() {
     loadProfile()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+      objectUrlsRef.current.clear()
+    }
+  }, [])
+
+  function trackObjectUrl(url, ttl = 5 * 60 * 1000) {
+    objectUrlsRef.current.add(url)
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url)
+      objectUrlsRef.current.delete(url)
+    }, ttl)
+  }
 
   function handleDragOver(e) {
     e.preventDefault()
@@ -170,7 +247,214 @@ export default function Resume() {
     }
   }
 
-  // Use backend endpoints for view/download to ensure correct headers and CORS handling.
+  async function readFetchError(response) {
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try {
+        const payload = await response.json()
+        return payload?.message || payload?.error || 'Resume request failed'
+      } catch (error) {
+        return 'Resume request failed'
+      }
+    }
+
+    try {
+      return (await response.text()) || 'Resume request failed'
+    } catch (error) {
+      return 'Resume request failed'
+    }
+  }
+
+  async function refreshResumeAccessToken() {
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': localStorage.getItem('preferredLanguage') || 'en',
+      },
+    })
+
+    if (!response.ok) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      throw Object.assign(new Error('Your session has expired. Please sign in again.'), {
+        status: response.status,
+        code: 'TOKEN_EXPIRED',
+      })
+    }
+
+    const data = await response.json().catch(() => null)
+    const payload = data?.data || data
+    const nextToken = payload?.token || payload?.accessToken || null
+
+    if (!nextToken) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      throw Object.assign(new Error('Your session has expired. Please sign in again.'), {
+        status: 401,
+        code: 'TOKEN_EXPIRED',
+      })
+    }
+
+    localStorage.setItem('token', nextToken)
+    if (payload?.user) localStorage.setItem('user', JSON.stringify(payload.user))
+
+    return nextToken
+  }
+
+  async function fetchResumeFile({ download = false, retrying = false } = {}) {
+    if (!hasResume) {
+      throw Object.assign(new Error('No resume file is available. Upload a resume first.'), {
+        status: 404,
+        code: 'NO_RESUME',
+      })
+    }
+
+    let token = localStorage.getItem('token')
+    if (!token) {
+      throw Object.assign(new Error('Please sign in again before opening your resume.'), {
+        status: 401,
+        code: 'TOKEN_MISSING',
+      })
+    }
+
+    const endpoint = download ? `${RESUME_FILE_ENDPOINT}?download=1` : RESUME_FILE_ENDPOINT
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/octet-stream',
+        'Accept-Language': localStorage.getItem('preferredLanguage') || 'en',
+      },
+    })
+
+    if (response.status === 401 && !retrying) {
+      token = await refreshResumeAccessToken()
+      if (token) return fetchResumeFile({ download, retrying: true })
+    }
+
+    if (!response.ok) {
+      const message = await readFetchError(response)
+      throw Object.assign(new Error(message), { status: response.status })
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+    const disposition = response.headers.get('content-disposition') || ''
+    const blob = await response.blob()
+    const blobType = blob.type || contentType || 'application/octet-stream'
+
+    if (!blob || blob.size === 0) {
+      throw Object.assign(new Error('The resume file is empty or unavailable.'), {
+        code: 'INVALID_FILE',
+      })
+    }
+
+    if (blobType.includes('application/json')) {
+      const message = await readJsonMessageFromBlob(blob)
+      throw Object.assign(new Error(message || 'The resume response was not a valid file.'), {
+        code: 'INVALID_FILE',
+      })
+    }
+
+    const headerFileName = getContentDispositionFilename(disposition)
+    const filename = ensureFileNameExtension(headerFileName || resumeFileName || 'Resume', blobType)
+    const typedBlob = blob.type ? blob : new Blob([blob], { type: blobType })
+
+    return { blob: typedBlob, filename, contentType: blobType }
+  }
+
+  function handleResumeDeliveryError(error, fallbackMessage) {
+    console.error('Resume delivery failed', error)
+
+    let message = error?.message || fallbackMessage || 'Unable to access your resume. Please try again.'
+    if (error?.code === 'TOKEN_MISSING') {
+      message = 'Please sign in again before opening your resume.'
+    } else if (error?.code === 'TOKEN_EXPIRED' || error?.status === 401) {
+      message = 'Your session has expired. Please sign in again before opening your resume.'
+    } else if (error?.status === 403) {
+      message = 'You are not authorized to access this resume.'
+    } else if (error?.status === 404 || error?.code === 'NO_RESUME') {
+      message = 'No resume file is available. Upload a resume first.'
+    } else if (error?.status === 502) {
+      message = 'Resume storage is temporarily unavailable. Please try again.'
+    } else if (error?.code === 'INVALID_FILE') {
+      message = error.message || 'The resume file could not be opened.'
+    }
+
+    setResumeError(message)
+    toast.error(message)
+  }
+
+  async function viewResume() {
+    setResumeError('')
+    setResumeMessage('')
+
+    const token = localStorage.getItem('token')
+    if (!token) {
+      handleResumeDeliveryError({ code: 'TOKEN_MISSING' })
+      return
+    }
+
+    const previewWindow = window.open('about:blank', '_blank')
+    if (!previewWindow) {
+      const message = 'Allow pop-ups to preview your resume in a new tab.'
+      setResumeError(message)
+      toast.error(message)
+      return
+    }
+
+    try {
+      previewWindow.opener = null
+      previewWindow.document.title = 'Resume Preview'
+      previewWindow.document.body.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;">Opening secure resume preview...</main>'
+    } catch (error) {
+      // Some browsers restrict writing to the temporary tab; location assignment still works.
+    }
+
+    setResumeDeliveryAction('view')
+    try {
+      const { blob } = await fetchResumeFile({ download: false })
+      const objectUrl = URL.createObjectURL(blob)
+      trackObjectUrl(objectUrl)
+      previewWindow.location.assign(objectUrl)
+      toast.success('Resume preview opened securely')
+    } catch (error) {
+      try {
+        previewWindow.close()
+      } catch (closeError) {}
+      handleResumeDeliveryError(error, 'Unable to open resume preview. Please try again.')
+    } finally {
+      setResumeDeliveryAction(null)
+    }
+  }
+
+  async function downloadResume() {
+    setResumeError('')
+    setResumeMessage('')
+    setResumeDeliveryAction('download')
+
+    try {
+      const { blob, filename } = await fetchResumeFile({ download: true })
+      const objectUrl = URL.createObjectURL(blob)
+      trackObjectUrl(objectUrl, 30 * 1000)
+
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = filename
+      link.rel = 'noopener'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+
+      toast.success('Resume download started')
+    } catch (error) {
+      handleResumeDeliveryError(error, 'Unable to download resume. Please try again.')
+    } finally {
+      setResumeDeliveryAction(null)
+    }
+  }
 
   async function analyzeResumeAction() {
     setResumeError('')
@@ -200,9 +484,9 @@ export default function Resume() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 animate-fade-in">
       <LoadingOverlay
-        visible={loading || resumeUploading || analysisLoading}
-        title={resumeUploading ? 'Uploading Resume' : analysisLoading ? 'Analyzing Resume' : 'Preparing Resume Center'}
-        subtitle={resumeUploading ? 'Uploading your file with secure progress tracking.' : analysisLoading ? 'Generating AI insights and premium scorecards.' : 'Loading your resume workspace.'}
+        visible={loading || resumeUploading || analysisLoading || isResumeDelivering}
+        title={resumeUploading ? 'Uploading Resume' : analysisLoading ? 'Analyzing Resume' : isViewingResume ? 'Opening Resume' : isDownloadingResume ? 'Preparing Download' : 'Preparing Resume Center'}
+        subtitle={resumeUploading ? 'Uploading your file with secure progress tracking.' : analysisLoading ? 'Generating AI insights and premium scorecards.' : isViewingResume ? 'Fetching your resume through the secure authenticated proxy.' : isDownloadingResume ? 'Preparing your secure resume download.' : 'Loading your resume workspace.'}
         progress={resumeUploading ? uploadProgress : undefined}
       />
       {/* Animated background gradient */}
@@ -413,32 +697,42 @@ export default function Resume() {
                       </div>
                     </div>
                     <div className="flex gap-3 pt-4 border-t border-slate-700">
-                      <a
-                        href={`/api/profile/resume/file`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 flex items-center justify-center gap-2"
+                      <button
+                        type="button"
+                        onClick={viewResume}
+                        disabled={isResumeDelivering}
+                        className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-400">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        View
-                      </a>
-                      <a
-                        href={`/api/profile/resume/file?download=1`}
-                        download={resumeFileName || 'Resume.pdf'}
-                        className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 flex items-center justify-center gap-2"
+                        {isViewingResume ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-400">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {isViewingResume ? 'Opening...' : 'View'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={downloadResume}
+                        disabled={isResumeDelivering}
+                        className="flex-1 rounded-lg bg-slate-700/50 border border-slate-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-400">
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        Download
-                      </a>
+                        {isDownloadingResume ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-cyan-400">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {isDownloadingResume ? 'Preparing...' : 'Download'}
+                      </button>
                       <button
                         onClick={removeResume}
+                        disabled={isResumeDelivering}
                         className="flex-1 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-300 hover:border-red-500/50 hover:bg-red-500/20 flex items-center justify-center gap-2"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-current">
