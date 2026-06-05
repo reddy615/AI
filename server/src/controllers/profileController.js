@@ -22,6 +22,49 @@ async function findDatabaseUser(req, { includePassword = false } = {}) {
   return query;
 }
 
+function isDownloadRequest(req) {
+  const value = String(req.query.download || '').toLowerCase();
+  return value === '1' || value === 'true';
+}
+
+function resolveResumeContentType({ remoteContentType, storedMimeType, filename, resumeUrl }) {
+  const remoteType = String(remoteContentType || '').toLowerCase();
+  const storedType = String(storedMimeType || '').toLowerCase();
+  const name = String(filename || resumeUrl || '').toLowerCase();
+
+  if (storedType) {
+    return storedMimeType;
+  }
+
+  if (name.endsWith('.pdf')) {
+    return 'application/pdf';
+  }
+
+  if (name.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+
+  if (name.endsWith('.doc')) {
+    return 'application/msword';
+  }
+
+  return remoteType || 'application/octet-stream';
+}
+
+function resolveResumeFilename(filename, contentType) {
+  let resolved = filename || 'Resume';
+  try {
+    if (!/\.[a-zA-Z0-9]+$/.test(resolved)) {
+      const type = String(contentType || '').toLowerCase();
+      if (type.includes('pdf')) resolved += '.pdf';
+      else if (type.includes('officedocument.wordprocessingml.document')) resolved += '.docx';
+      else if (type.includes('msword')) resolved += '.doc';
+    }
+  } catch (e) {}
+
+  return resolved.replace(/"/g, '');
+}
+
 exports.getProfile = asyncHandler(async (req, res) => {
   const user = await findDatabaseUser(req);
   if (!user) {
@@ -168,8 +211,7 @@ exports.serveResumeFile = asyncHandler(async (req, res) => {
     return sendError(res, 'No resume available', 404);
   }
 
-  // Determine whether this is a forced download
-  const forceDownload = String(req.query.download || '').toLowerCase() === '1' || String(req.query.download || '').toLowerCase() === 'true';
+  const forceDownload = isDownloadRequest(req);
 
   // Fetch the remote resource and stream it back with correct headers
   const fetchUrl = resumeUrl;
@@ -178,23 +220,21 @@ exports.serveResumeFile = asyncHandler(async (req, res) => {
     return sendError(res, 'Failed to fetch resume file', 502);
   }
 
-  const contentType = remoteResp.headers.get('content-type') || user.resumeMimeType || 'application/octet-stream';
+  const contentType = resolveResumeContentType({
+    remoteContentType: remoteResp.headers.get('content-type'),
+    storedMimeType: user.resumeMimeType,
+    filename: user.resumeFileName,
+    resumeUrl,
+  });
+  const safeFilename = resolveResumeFilename(user.resumeFileName, contentType);
 
-  // Ensure filename has sensible fallback and extension
-  let filename = user.resumeFileName || 'Resume';
-  try {
-    if (!/\.[a-zA-Z0-9]+$/.test(filename)) {
-      const ext = (contentType && contentType.includes('pdf')) ? '.pdf' : '';
-      filename = filename + ext;
-    }
-  } catch (e) {}
-
-  const dispositionType = forceDownload ? 'attachment' : 'inline';
-  const safeFilename = filename.replace(/"/g, '');
-  const disposition = `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`;
+  const disposition = forceDownload
+    ? `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`
+    : 'inline';
 
   res.setHeader('Content-Type', contentType);
   res.setHeader('Content-Disposition', disposition);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
 
   // Stream the response body to the client
