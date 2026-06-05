@@ -82,6 +82,20 @@ async function readJsonMessageFromBlob(blob) {
   }
 }
 
+function isPdfResume({ filename, contentType, resumeFileName }) {
+  const type = String(contentType || '').toLowerCase()
+  const name = String(filename || resumeFileName || '').toLowerCase()
+  return type.includes('pdf') || name.endsWith('.pdf')
+}
+
+function createPreviewBlob(blob, { filename, contentType, resumeFileName } = {}) {
+  if (isPdfResume({ filename, contentType, resumeFileName })) {
+    return blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' })
+  }
+
+  return blob
+}
+
 export default function Resume() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -390,40 +404,29 @@ export default function Resume() {
   async function viewResume() {
     setResumeError('')
     setResumeMessage('')
-
-    const token = localStorage.getItem('token')
-    if (!token) {
-      handleResumeDeliveryError({ code: 'TOKEN_MISSING' })
-      return
-    }
-
-    const previewWindow = window.open('about:blank', '_blank')
-    if (!previewWindow) {
-      const message = 'Allow pop-ups to preview your resume in a new tab.'
-      setResumeError(message)
-      toast.error(message)
-      return
-    }
-
-    try {
-      previewWindow.opener = null
-      previewWindow.document.title = 'Resume Preview'
-      previewWindow.document.body.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;">Opening secure resume preview...</main>'
-    } catch (error) {
-      // Some browsers restrict writing to the temporary tab; location assignment still works.
-    }
-
     setResumeDeliveryAction('view')
+
     try {
-      const { blob } = await fetchResumeFile({ download: false })
-      const objectUrl = URL.createObjectURL(blob)
+      const { blob, filename, contentType } = await fetchResumeFile({ download: false })
+      const previewBlob = createPreviewBlob(blob, { filename, contentType, resumeFileName })
+      const objectUrl = URL.createObjectURL(previewBlob)
       trackObjectUrl(objectUrl)
-      previewWindow.location.assign(objectUrl)
+
+      const previewWindow = window.open(objectUrl, '_blank')
+      if (!previewWindow) {
+        URL.revokeObjectURL(objectUrl)
+        objectUrlsRef.current.delete(objectUrl)
+        throw Object.assign(new Error('Allow pop-ups to preview your resume in a new tab.'), {
+          code: 'POPUP_BLOCKED',
+        })
+      }
+
+      try {
+        previewWindow.opener = null
+      } catch (error) {}
+
       toast.success('Resume preview opened securely')
     } catch (error) {
-      try {
-        previewWindow.close()
-      } catch (closeError) {}
       handleResumeDeliveryError(error, 'Unable to open resume preview. Please try again.')
     } finally {
       setResumeDeliveryAction(null)
