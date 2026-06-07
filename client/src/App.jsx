@@ -35,6 +35,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('[App] mounted, bootstrapping auth with token:', !!token)
     const loadUser = async () => {
       if (token) {
         try {
@@ -47,7 +48,7 @@ export default function App() {
             dispatch(setUser(null))
           }
         } catch (error) {
-          console.error('Error loading user:', error)
+          console.error('[App] profile load failed:', error.message)
           dispatch(clearToken())
           dispatch(setUser(null))
         }
@@ -55,7 +56,7 @@ export default function App() {
       setLoading(false)
     }
     loadUser()
-  }, [token, dispatch])
+  }, [])
 
   const handleLogout = () => {
     dispatch(clearAuth())
