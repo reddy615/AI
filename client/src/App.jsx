@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { useDispatch } from 'react-redux'
-import { setUser } from './store/store'
+import { useDispatch, useSelector } from 'react-redux'
+import { setUser, clearToken } from './store/store'
 import Navigation from './components/Navigation'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -30,21 +30,20 @@ export default function App() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const location = useLocation()
-  const [user, setUserState] = useState(null)
+  const user = useSelector((s) => s.auth.user)
+  const token = useSelector((s) => s.auth.token)
   const [loading, setLoading] = useState(true)
-  const token = localStorage.getItem('token')
 
   useEffect(() => {
     const loadUser = async () => {
       if (token) {
         try {
           const response = await api.get('/api/profile')
-          setUserState(response.data)
           dispatch(setUser(response.data))
         } catch (error) {
           console.error('Error loading user:', error)
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
+          dispatch(clearToken())
+          dispatch(setUser(null))
         }
       }
       setLoading(false)
