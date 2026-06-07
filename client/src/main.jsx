@@ -7,6 +7,7 @@ import { Provider } from 'react-redux'
 import store from './store/store'
 import { LanguageProvider } from './context/LanguageContext'
 import { ToastProvider } from './components/ToastProvider'
+import ErrorBoundary from './components/ErrorBoundary'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -14,8 +15,10 @@ createRoot(document.getElementById('root')).render(
       <LanguageProvider>
         <HashRouter>
           <ToastProvider>
-            <App />
-          </ToastProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </ToastProvider>
         </HashRouter>
       </LanguageProvider>
     </Provider>
