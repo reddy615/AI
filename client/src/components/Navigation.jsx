@@ -19,7 +19,6 @@ export default function Navigation({ user, onLogout }) {
 
   const handleLogout = () => {
     onLogout()
-    navigate('/')
     setIsOpen(false)
   }
 
@@ -106,6 +105,7 @@ export default function Navigation({ user, onLogout }) {
                     {user.name}
                   </Link>
                   <motion.button
+                    type="button"
                     onClick={handleLogout}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -181,6 +181,7 @@ export default function Navigation({ user, onLogout }) {
                   <>
                     <div className="px-4 py-2 text-sm text-slate-400">{user.name}</div>
                     <motion.button
+                      type="button"
                       onClick={handleLogout}
                       className="w-full rounded-lg bg-red-500/20 border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/30 flex items-center justify-center gap-2 mt-2"
                       whileHover={{ scale: 1.02 }}

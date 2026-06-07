@@ -19,11 +19,17 @@ const authSlice = createSlice({
       } else {
         localStorage.removeItem('user')
       }
+    },
+    clearAuth(state) {
+      state.token = null
+      state.user = null
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
     }
   }
 })
 
-export const { setToken, clearToken, setUser } = authSlice.actions
+export const { setToken, clearToken, setUser, clearAuth } = authSlice.actions
 
 const store = configureStore({ reducer: { auth: authSlice.reducer } })
 export default store

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import StatsCard from '../components/StatsCard'
 import PerformanceLineChart from '../components/PerformanceLineChart'
 import LoadingOverlay from '../components/LoadingOverlay'
 import { useToast } from '../components/ToastProvider'
+import { clearAuth } from '../store/store'
 
 function formatPercent(value) {
   return `${Number(value || 0)}%`
@@ -18,6 +20,7 @@ export default function Dashboard() {
   const [gamification, setGamification] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const toast = useToast()
 
   const loadDashboard = async () => {
@@ -60,7 +63,9 @@ export default function Dashboard() {
       console.error(error)
     } finally {
       localStorage.removeItem('token')
-      window.location.href = '/'
+      localStorage.removeItem('user')
+      dispatch(clearAuth())
+      navigate('/', { replace: true })
     }
   }
 

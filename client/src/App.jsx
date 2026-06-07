@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
-import { setUser, clearToken } from './store/store'
+import { setUser, clearToken, clearAuth } from './store/store'
 import Navigation from './components/Navigation'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -39,7 +39,13 @@ export default function App() {
       if (token) {
         try {
           const response = await api.get('/api/profile')
-          dispatch(setUser(response.data))
+          const profile = response.data?.data?.user || response.data?.user || response.data?.data || response.data || null
+          if (profile) {
+            dispatch(setUser(profile))
+          } else {
+            dispatch(clearToken())
+            dispatch(setUser(null))
+          }
         } catch (error) {
           console.error('Error loading user:', error)
           dispatch(clearToken())
@@ -52,11 +58,8 @@ export default function App() {
   }, [token, dispatch])
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    setUserState(null)
-    dispatch(setUser(null))
-    navigate('/')
+    dispatch(clearAuth())
+    navigate('/', { replace: true })
   }
 
   if (loading) {

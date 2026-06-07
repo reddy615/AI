@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import api from '../api/api'
 import { useNavigate, Link } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { setToken, setUser } from '../store/store'
 
 export default function Register(){
   const [name,setName]=useState('')
@@ -9,13 +11,18 @@ export default function Register(){
   const [showPassword,setShowPassword]=useState(false)
   const [error,setError]=useState(null)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const submit = async (e)=>{
     e.preventDefault()
     try{
       const res = await api.post('/api/auth/register',{name,email,password})
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify(res.data.user || {}))
+      const payload = res.data?.data || res.data || {}
+      const token = payload.token || payload.accessToken || res.data?.token || null
+      const user = payload.user || res.data?.user || null
+
+      if (token) dispatch(setToken(token))
+      if (user) dispatch(setUser(user))
       navigate('/dashboard')
     }catch(err){ setError(err.response?.data?.message || 'Error') }
   }
