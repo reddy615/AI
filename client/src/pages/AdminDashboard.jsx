@@ -238,11 +238,144 @@ export default function AdminDashboard() {
     </div>
   )
 
+  const formatDate = (d) => {
+    if (!d) return '-'
+    try {
+      const date = new Date(d)
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    } catch (e) {
+      return String(d)
+    }
+  }
+
+  const renderLeaderboard = () => {
+    const list = data.leaderboard || []
+    if (!list.length) {
+      return (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+          No leaderboard activity yet.
+        </div>
+      )
+    }
+
+    return (
+      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <table className="min-w-full text-sm">
+          <thead className="text-xs uppercase tracking-[0.12em] text-slate-500">
+            <tr>
+              <th className="py-2 px-3 text-left">Rank</th>
+              <th className="py-2 px-3 text-left">Name</th>
+              <th className="py-2 px-3 text-left">XP</th>
+              <th className="py-2 px-3 text-left">Level</th>
+              <th className="py-2 px-3 text-left">Streak</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {list.map((entry, idx) => (
+              <tr key={entry.userId || entry.id || idx} className="hover:bg-slate-50">
+                <td className="py-3 px-3 text-slate-700">#{entry.rank || idx + 1}</td>
+                <td className="py-3 px-3 font-semibold text-slate-900">{entry.name || entry.username || entry.displayName || 'Unknown'}</td>
+                <td className="py-3 px-3 text-slate-700">{entry.xp || 0}</td>
+                <td className="py-3 px-3 text-slate-700">{entry.level || entry.levelName || '-'}</td>
+                <td className="py-3 px-3 text-slate-700">{entry.streak || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  const renderTopUsers = () => {
+    const top = data.users?.slice(0, 10) || []
+    if (loading) {
+      return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+    }
+
+    if (!top.length) {
+      return (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">No users found.</div>
+      )
+    }
+
+    return (
+      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <table className="min-w-full text-sm">
+          <thead className="text-xs uppercase tracking-[0.12em] text-slate-500">
+            <tr>
+              <th className="py-2 px-3 text-left">Name</th>
+              <th className="py-2 px-3 text-left">Email</th>
+              <th className="py-2 px-3 text-left">XP</th>
+              <th className="py-2 px-3 text-left">Level</th>
+              <th className="py-2 px-3 text-left">Interviews</th>
+              <th className="py-2 px-3 text-left">Coding Attempts</th>
+              <th className="py-2 px-3 text-left">Joined</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {top.map((u) => (
+              <tr key={u._id || u.id} className="hover:bg-slate-50">
+                <td className="py-3 px-3 font-semibold text-slate-900">{u.name || '—'}</td>
+                <td className="py-3 px-3 text-slate-700 truncate max-w-[200px]">{u.email || '—'}</td>
+                <td className="py-3 px-3 text-slate-700">{u.xp || 0}</td>
+                <td className="py-3 px-3 text-slate-700">{u.level || '-'}</td>
+                <td className="py-3 px-3 text-slate-700">{u.interviews || u.interviewCount || 0}</td>
+                <td className="py-3 px-3 text-slate-700">{u.codingAttempts || u.codingCount || 0}</td>
+                <td className="py-3 px-3 text-slate-700">{formatDate(u.createdAt || u.joinedAt || u.registeredAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  const renderAnalyticsSummary = () => {
+    const s = data.summary || {}
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900 mb-3">Analytics Summary</h3>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <div className="text-xs text-slate-500">Users</div>
+            <div className="text-xl font-bold text-slate-900">{s.userCount ?? '-'}</div>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <div className="text-xs text-slate-500">Active</div>
+            <div className="text-xl font-bold text-slate-900">{s.activeUserCount ?? '-'}</div>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <div className="text-xs text-slate-500">Questions</div>
+            <div className="text-xl font-bold text-slate-900">{(s.questionCount || 0) + (s.aiQuestionCount || 0)}</div>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-lg">
+            <div className="text-xs text-slate-500">Sessions</div>
+            <div className="text-xl font-bold text-slate-900">{s.interviewCount ?? '-'}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderReports = () => (
-    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-      <pre className="overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-        {JSON.stringify(data.reports, null, 2)}
-      </pre>
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">{renderAnalyticsSummary()}</div>
+        <div>{renderLeaderboard()}</div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div>{renderTopUsers()}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">User Statistics</h3>
+          <div className="space-y-3 text-sm text-slate-700">
+            <div>Average XP: <strong className="text-slate-900">{data.summary?.averageXp ?? '—'}</strong></div>
+            <div>Average Attempts: <strong className="text-slate-900">{data.summary?.averageAttempts ?? '—'}</strong></div>
+            <div>Retention (30d): <strong className="text-slate-900">{data.summary?.retention30d ?? '—'}</strong></div>
+            <div>Active Today: <strong className="text-slate-900">{data.summary?.activeToday ?? '—'}</strong></div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
