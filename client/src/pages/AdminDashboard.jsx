@@ -127,15 +127,57 @@ export default function AdminDashboard() {
 
         <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Platform Reports</h2>
-            {data.reports ? (
-              <pre className="mt-4 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-                {JSON.stringify(data.reports, null, 2)}
-              </pre>
+          <div className="mt-4 space-y-4">
+            {loading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
+              </div>
+            ) : data.reports ? (
+              Array.isArray(data.reports) ? (
+                <div className="overflow-auto rounded-2xl border border-slate-100 bg-white p-2">
+                  <table className="min-w-full text-sm">
+                    <thead className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                      <tr>
+                        <th className="py-2 px-3 text-left">Type</th>
+                        <th className="py-2 px-3 text-left">Source</th>
+                        <th className="py-2 px-3 text-left">Date</th>
+                        <th className="py-2 px-3 text-left">Status</th>
+                        <th className="py-2 px-3 text-left">Note</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {data.reports.map((r, idx) => (
+                        <tr key={r.id || r._id || idx} className="hover:bg-slate-50">
+                          <td className="py-3 px-3 text-slate-700">{r.type || r.reportType || 'report'}</td>
+                          <td className="py-3 px-3 text-slate-700 truncate max-w-[180px]">{r.source || r.origin || r.userEmail || 'system'}</td>
+                          <td className="py-3 px-3 text-slate-700">{formatDate(r.createdAt || r.date)}</td>
+                          <td className="py-3 px-3 text-slate-700">{r.status || r.state || 'open'}</td>
+                          <td className="py-3 px-3 text-slate-700 truncate max-w-[280px]">{r.summary || r.message || r.note || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.keys(data.reports).length ? Object.entries(data.reports).map(([k, v]) => (
+                    <div key={k} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="text-xs text-slate-500">{k}</div>
+                      <div className="mt-2 font-semibold text-slate-900">{typeof v === 'number' ? v : (Array.isArray(v) ? v.length : String(v).slice(0, 120))}</div>
+                    </div>
+                  )) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                      No reports available.
+                    </div>
+                  )}
+                </div>
+              )
             ) : (
               <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                No analytics available.
+                No reports available.
               </div>
             )}
+          </div>
         </div>
       </section>
     </div>
