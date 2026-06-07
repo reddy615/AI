@@ -58,7 +58,7 @@ export default function Register(){
         </div>
         <button className="bg-blue-600 text-white px-4 py-2 rounded">Register</button>
       </form>
-      <p className="mt-3 text-sm">Already have an account? <Link to="/">Login</Link></p>
+      <p className="mt-3 text-sm">Already have an account? <Link to="/login">Login</Link></p>
     </div>
   )
 }
