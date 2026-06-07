@@ -21,6 +21,7 @@ import GrowthDashboard from './pages/GrowthDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import PageTransition from './components/PageTransition'
+import Footer from './components/Footer'
 import { useLanguage } from './context/LanguageContext'
 import api from './api/api'
 
@@ -76,9 +77,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-slate-950">
       <Navigation user={user} onLogout={handleLogout} />
-      <div className="pt-20">
+      <main className="flex-1 pt-20">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={!token ? <PageTransition><Home /></PageTransition> : <Navigate to="/dashboard" replace />} />
@@ -97,7 +98,8 @@ export default function App() {
             <Route path="/admin" element={<ProtectedRoute><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />
           </Routes>
         </AnimatePresence>
-      </div>
+      </main>
+      <Footer />
     </div>
   )
 }
