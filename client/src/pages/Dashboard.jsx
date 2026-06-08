@@ -52,8 +52,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard()
+
+    const handleDashboardRefresh = (event) => {
+      if (!event?.detail || event.detail.type !== 'quiz-submitted') return
+      loadDashboard()
+    }
+
+    const handleStorageRefresh = (event) => {
+      if (event.key === 'ai-dashboard-refresh') {
+        loadDashboard()
+      }
+    }
+
+    window.addEventListener('ai-dashboard-refresh', handleDashboardRefresh)
+    window.addEventListener('storage', handleStorageRefresh)
+
     const intervalId = setInterval(loadDashboard, 30000)
-    return () => clearInterval(intervalId)
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener('ai-dashboard-refresh', handleDashboardRefresh)
+      window.removeEventListener('storage', handleStorageRefresh)
+    }
   }, [])
 
   const logout = async () => {
@@ -184,6 +203,34 @@ export default function Dashboard() {
                 ))
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">Recommendations will appear after a few completed assessments.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Recent Activity</h3>
+                <p className="text-sm text-slate-500">Latest quiz and XP updates from your practice sessions.</p>
+              </div>
+              <Link to="/analytics" className="text-sm font-medium text-blue-600 hover:text-blue-700">See full activity</Link>
+            </div>
+            <div className="mt-4 space-y-3">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16" />)
+              ) : gamification?.progress?.recentActivities?.length ? (
+                gamification.progress.recentActivities.slice(0, 5).map((activity, index) => (
+                  <div key={`${activity.type}-${index}`} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-900 capitalize">{activity.source.replace('-', ' ')}</span>
+                      <span className="text-slate-500">+{activity.xp} XP</span>
+                    </div>
+                    <div className="mt-1 text-slate-500">Score: {activity.score ?? 'N/A'} · Module: {activity.module || 'General'}</div>
+                    <div className="mt-1 text-xs text-slate-400">{new Date(activity.createdAt).toLocaleString()}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">Your completed quizzes and XP earnings will show here.</div>
               )}
             </div>
           </div>

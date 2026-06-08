@@ -314,7 +314,9 @@ exports.submitAnswers = asyncHandler(async (req, res) => {
   const { score, correct, wrong, skipped, answerRecords } = scoreQuizAnswers(questionsById, answers);
   const totalQuestions = questionsById.size;
 
-  if (!dbQuestionIds.length || mongoose.connection.readyState !== 1) {
+  const isDatabaseAvailable = mongoose.connection.readyState === 1;
+
+  if (!isDatabaseAvailable) {
     const attemptId = `local-attempt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const attempt = {
       _id: attemptId,
