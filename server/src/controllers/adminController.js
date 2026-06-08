@@ -304,8 +304,27 @@ exports.getUserResume = asyncHandler(async (req, res) => {
 
   // Fetch the remote resource and stream it back with correct headers
   try {
+    console.log('[ADMIN RESUME] targetUserId=', targetUserId);
+    console.log('[ADMIN RESUME] targetUser=', {
+      id: targetUser._id,
+      email: targetUser.email,
+      name: targetUser.name,
+      resumeUrl: targetUser.resumeUrl,
+      resumeFileName: targetUser.resumeFileName,
+      resumeMimeType: targetUser.resumeMimeType,
+      forceDownload,
+    });
+
     const remoteResp = await fetch(resumeUrl);
+    console.log('[ADMIN RESUME] remote fetch status=', remoteResp.status, remoteResp.statusText);
+    console.log('[ADMIN RESUME] remote response headers=', Object.fromEntries(remoteResp.headers.entries()));
+
     if (!remoteResp.ok) {
+      console.error('[ADMIN RESUME] Cloudinary fetch failed', {
+        status: remoteResp.status,
+        statusText: remoteResp.statusText,
+        resumeUrl,
+      });
       return sendError(res, 'Failed to fetch resume file from storage', 502);
     }
 
@@ -321,34 +340,62 @@ exports.getUserResume = asyncHandler(async (req, res) => {
       ? `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`
       : 'inline';
 
+    console.log('[ADMIN RESUME] resolved contentType=', contentType);
+    console.log('[ADMIN RESUME] resolved filename=', safeFilename);
+    console.log('[ADMIN RESUME] content-disposition=', disposition);
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', disposition);
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
 
     // Stream the response body to the client
     const body = remoteResp.body;
     if (body && typeof body.pipe === 'function') {
-      // Handle stream errors
+      console.log('[ADMIN RESUME] using Node stream pipe for resume');
       body.on('error', (err) => {
+        console.error('[ADMIN RESUME] body stream error', err.stack || err.message || err);
         if (!res.headersSent) {
           res.status(500).json({ error: 'Stream error while reading resume' });
         }
       });
       
       res.on('error', (err) => {
-        // Handle response stream errors
+        console.error('[ADMIN RESUME] response stream error', err.stack || err.message || err);
       });
       
       body.pipe(res);
       return;
     }
 
-    // Fallback: buffer and send
+    if (body && typeof body.getReader === 'function') {
+      console.log('[ADMIN RESUME] converting Web ReadableStream to Node stream');
+      const { Readable } = require('stream');
+      try {
+        const nodeStream = Readable.fromWeb(body);
+        nodeStream.on('error', (err) => {
+          console.error('[ADMIN RESUME] converted stream error', err.stack || err.message || err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Stream error while reading resume' });
+          }
+        });
+        res.on('error', (err) => {
+          console.error('[ADMIN RESUME] response stream error', err.stack || err.message || err);
+        });
+        nodeStream.pipe(res);
+        return;
+      } catch (streamError) {
+        console.error('[ADMIN RESUME] failed to convert Web ReadableStream', streamError.stack || streamError.message || streamError);
+      }
+    }
+
+    console.log('[ADMIN RESUME] fallback to buffer send; body pipe not available');
     const buffer = await remoteResp.arrayBuffer();
+    console.log('[ADMIN RESUME] buffer length=', buffer.byteLength);
     res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error('Error serving admin resume:', error.message);
+    console.error('[ADMIN RESUME] Error serving admin resume:', error.stack || error.message || error);
     return sendError(res, 'Failed to retrieve resume file', 500);
   }
 });

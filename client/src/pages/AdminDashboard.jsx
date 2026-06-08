@@ -82,16 +82,22 @@ export default function AdminDashboard() {
   }
 
   const handleViewResume = async (user) => {
-    if (!user?._id) {
+    const userId = user?._id || user?.id
+    if (!userId) {
       toast.error('User ID not found')
       return
     }
 
     try {
+      console.log('[ADMIN RESUME] view request for user=', userId, 'resumeFileName=', user.resumeFileName)
       // Fetch resume file as blob using authenticated admin endpoint
-      const response = await api.get(`/api/admin/users/${user._id}/resume`, {
+      const response = await api.get(`/api/admin/users/${userId}/resume`, {
         responseType: 'blob',
       })
+
+      console.log('[ADMIN RESUME] view response status=', response.status)
+      console.log('[ADMIN RESUME] view response headers=', response.headers)
+      console.log('[ADMIN RESUME] view blob type=', response.data?.type, 'size=', response.data?.size)
 
       // Create blob URL for inline viewing
       const blobUrl = window.URL.createObjectURL(response.data)
@@ -106,32 +112,56 @@ export default function AdminDashboard() {
 
       toast.success('Resume opened in new tab')
     } catch (requestError) {
-      const message = requestError.response?.data?.message || 'Failed to view resume'
+      console.error('[ADMIN RESUME] view caught error', requestError)
+      let message = requestError.message || 'Failed to view resume'
+      if (requestError.response) {
+        const responseData = requestError.response.data
+        if (responseData instanceof Blob) {
+          let text = ''
+          try {
+            text = await responseData.text()
+            const parsed = JSON.parse(text)
+            message = parsed.message || parsed.error || text || message
+          } catch (parseError) {
+            message = responseData.type ? `${responseData.type} error` : text || message
+          }
+        } else {
+          message = responseData?.message || message
+        }
+      }
       toast.error(message)
-      console.error('View resume error:', requestError)
     }
   }
 
   const handleDownloadResume = async (user) => {
-    if (!user?._id) {
+    const userId = user?._id || user?.id
+    if (!userId) {
       toast.error('User ID not found')
       return
     }
 
     try {
+      console.log('[ADMIN RESUME] download request for user=', userId, 'resumeFileName=', user.resumeFileName)
       // Fetch resume file as blob using authenticated admin endpoint with download flag
-      const response = await api.get(`/api/admin/users/${user._id}/resume`, {
+      const response = await api.get(`/api/admin/users/${userId}/resume`, {
         responseType: 'blob',
         params: { download: 'true' },
       })
 
+      console.log('[ADMIN RESUME] download response status=', response.status)
+      console.log('[ADMIN RESUME] download response headers=', response.headers)
+      console.log('[ADMIN RESUME] download blob type=', response.data?.type, 'size=', response.data?.size)
+
       // Create blob URL for download
       const blobUrl = window.URL.createObjectURL(response.data)
+      
+      const disposition = response.headers['content-disposition'] || response.headers['Content-Disposition'] || ''
+      const filenameMatch = disposition.match(/filename\*=UTF-8''([^;\n\r]+)/i) || disposition.match(/filename="([^"]+)"/i) || disposition.match(/filename=([^;\n\r]+)/i)
+      const filename = (filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1]) : user.resumeFileName) || 'resume.pdf'
       
       // Create temporary anchor element to trigger download
       const link = document.createElement('a')
       link.href = blobUrl
-      const filename = user.resumeFileName || 'resume.pdf'
       link.setAttribute('download', filename)
       document.body.appendChild(link)
       link.click()
@@ -142,9 +172,24 @@ export default function AdminDashboard() {
 
       toast.success('Resume downloaded successfully')
     } catch (requestError) {
-      const message = requestError.response?.data?.message || 'Failed to download resume'
+      console.error('[ADMIN RESUME] download caught error', requestError)
+      let message = requestError.message || 'Failed to download resume'
+      if (requestError.response) {
+        const responseData = requestError.response.data
+        if (responseData instanceof Blob) {
+          let text = ''
+          try {
+            text = await responseData.text()
+            const parsed = JSON.parse(text)
+            message = parsed.message || parsed.error || text || message
+          } catch (parseError) {
+            message = responseData.type ? `${responseData.type} error` : text || responseData?.toString() || message
+          }
+        } else {
+          message = responseData?.message || message
+        }
+      }
       toast.error(message)
-      console.error('Download resume error:', requestError)
     }
   }
 
