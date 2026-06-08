@@ -46,6 +46,14 @@ async function sendResumeReminderEmail(user) {
     },
   });
 
+  console.log('EMAIL_USER:', process.env.EMAIL_USER);
+  console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
+  console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
+  console.log('EMAIL_SECURE:', process.env.EMAIL_SECURE);
+
+  await transporter.verify();
+  console.log('SMTP connection successful');
+
   const html = `
     <p>Hi ${user.name || 'Candidate'},</p>
     <p>We are reviewing your profile and noticed that your resume is not yet uploaded.</p>
@@ -465,6 +473,8 @@ exports.sendResumeReminder = asyncHandler(async (req, res) => {
     return res.apiSuccess({}, 'Reminder email sent successfully');
   } catch (error) {
     console.error('[ADMIN REMINDER] Error sending resume reminder:', error.stack || error.message || error);
-    return sendError(res, 'Failed to send resume reminder email', 502);
+    console.error('EMAIL ERROR:', error);
+    const message = error?.message || 'Failed to send resume reminder email';
+    return sendError(res, message, 502);
   }
 });
