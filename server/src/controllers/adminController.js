@@ -13,9 +13,6 @@ const nodemailer = require('nodemailer');
 
 const emailReminderCooldownMap = new Map();
 const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
-const EMAIL_SMTP_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_SMTP_PORT = Number(process.env.EMAIL_PORT) || 587;
-const EMAIL_SMTP_SECURE = String(process.env.EMAIL_SECURE || 'false').toLowerCase() === 'true';
 const EMAIL_FROM = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
 function isEmailConfigured() {
@@ -37,19 +34,16 @@ function recordReminderSent(userId) {
 
 async function sendResumeReminderEmail(user) {
   const transporter = nodemailer.createTransport({
-    host: EMAIL_SMTP_HOST,
-    port: EMAIL_SMTP_PORT,
-    secure: EMAIL_SMTP_SECURE,
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000,
   });
 
   console.log('EMAIL_USER:', process.env.EMAIL_USER);
-  console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
-  console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
-  console.log('EMAIL_SECURE:', process.env.EMAIL_SECURE);
+  console.log('EMAIL_FROM:', EMAIL_FROM);
 
   await transporter.verify();
   console.log('SMTP connection successful');
