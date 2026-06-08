@@ -12,7 +12,6 @@ export default function AdminDashboard() {
   const [data, setData] = useState({ summary: null, users: [], questions: [], interviews: [], reports: null, leaderboard: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [reminderLoading, setReminderLoading] = useState({})
   const { t } = useLanguage()
   const toast = useToast()
 
@@ -97,7 +96,10 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleSendReminder = async (user) => {
+  const handleSendResumeReminder = async (user) => {
+    console.log('USER DATA:', user)
+    console.log('RESUME URL:', user.resumeUrl)
+
     const userId = user?._id || user?.id
     if (!userId) {
       toast.error('User ID not found')
@@ -367,7 +369,7 @@ export default function AdminDashboard() {
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap gap-2">
-                    {user.hasResume ? (
+                    {user.resumeUrl ? (
                       <>
                         <button 
                           onClick={() => handleViewResume(user)}
@@ -386,9 +388,9 @@ export default function AdminDashboard() {
                       </>
                     ) : (
                       <button
-                        onClick={() => handleSendReminder(user)}
+                        onClick={() => handleSendResumeReminder(user)}
                         disabled={Boolean(reminderLoading[user._id || user.id])}
-                        className="rounded-full bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 px-3 py-1.5 text-xs font-semibold text-white shadow-lg hover:from-orange-600 hover:via-amber-400 hover:to-orange-500 transition disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {reminderLoading[user._id || user.id] ? 'Sending...' : 'Send Mail'}
                       </button>
