@@ -116,7 +116,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
     runAdminQuery(
       'users.list',
       () => User.find(query)
-        .select('name email role isActive preferredLanguage createdAt updatedAt')
+        .select('name email role isActive preferredLanguage createdAt updatedAt resumeUrl resumeFileName resumeMimeType')
         .sort({ createdAt: -1 })
         .skip((safePage - 1) * safeLimit)
         .limit(safeLimit)
@@ -145,6 +145,10 @@ exports.listUsers = asyncHandler(async (req, res) => {
       level: progress?.level || 1,
       streak: progress?.streak || 0,
       badges: progress?.badges || [],
+      resumeUrl: user.resumeUrl || null,
+      resumeFileName: user.resumeFileName || null,
+      resumeUploadedAt: user.resumeUrl ? user.updatedAt : null,
+      hasResume: !!user.resumeUrl,
     };
   });
 

@@ -81,6 +81,55 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleViewResume = (user) => {
+    if (!user?.resumeUrl) {
+      toast.error('No resume available')
+      return
+    }
+    // Open in new tab using the secure proxy endpoint
+    window.open('/api/profile/resume/file', '_blank')
+  }
+
+  const handleDownloadResume = async (user) => {
+    if (!user?.resumeUrl) {
+      toast.error('No resume available')
+      return
+    }
+    try {
+      // Request the resume file with download flag
+      const response = await api.get('/api/profile/resume/file', {
+        responseType: 'blob',
+        params: { download: 'true' },
+      })
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(response)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', user.resumeFileName || 'resume.pdf')
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success('Resume downloaded successfully')
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Failed to download resume'
+      toast.error(message)
+      console.error('Download error:', requestError)
+    }
+  }
+
+  const formatResumeDate = (d) => {
+    if (!d) return '-'
+    try {
+      const date = new Date(d)
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    } catch (e) {
+      return String(d)
+    }
+  }
+
   const renderOverview = () => (
     <div className="space-y-6">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -188,12 +237,12 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900">User Management</h2>
-          <p className="text-sm text-slate-500">Promote admins, deactivate accounts, or switch preference settings.</p>
+          <p className="text-sm text-slate-500">Promote admins, deactivate accounts, view resumes, or switch preference settings.</p>
         </div>
-        <button onClick={loadData} className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Refresh</button>
+        <button onClick={loadData} className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition">Refresh</button>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.18em] text-slate-500">
             <tr>
@@ -201,14 +250,15 @@ export default function AdminDashboard() {
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Language</th>
               <th className="px-4 py-3">XP</th>
+              <th className="px-4 py-3">Resume</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {loading ? (
-              <tr><td className="px-4 py-4" colSpan="5"><Skeleton className="h-10" /></td></tr>
+              <tr><td className="px-4 py-4" colSpan="6"><Skeleton className="h-10" /></td></tr>
             ) : data.users.length ? data.users.map((user) => (
-              <tr key={user._id || user.id}>
+              <tr key={user._id || user.id} className="hover:bg-slate-50 transition">
                 <td className="px-4 py-4">
                   <div className="font-semibold text-slate-900">{user.name}</div>
                   <div className="text-xs text-slate-500">{user.email}</div>
@@ -217,11 +267,56 @@ export default function AdminDashboard() {
                 <td className="px-4 py-4 uppercase text-slate-700">{user.preferredLanguage || 'en'}</td>
                 <td className="px-4 py-4 text-slate-700">{user.xp || 0}</td>
                 <td className="px-4 py-4">
+                  {user.hasResume ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                          ✓ Uploaded
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 truncate max-w-[150px]" title={user.resumeFileName}>
+                        {user.resumeFileName || 'resume'}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {formatResumeDate(user.resumeUploadedAt)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      Not Uploaded
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4">
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => updateUser(user._id || user.id, { role: user.role === 'admin' ? 'user' : 'admin' })} className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+                    {user.hasResume && (
+                      <>
+                        <button 
+                          onClick={() => handleViewResume(user)}
+                          title={`View ${user.resumeFileName || 'resume'}`}
+                          className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition"
+                        >
+                          View
+                        </button>
+                        <button 
+                          onClick={() => handleDownloadResume(user)}
+                          title={`Download ${user.resumeFileName || 'resume'}`}
+                          className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 transition"
+                        >
+                          Download
+                        </button>
+                      </>
+                    )}
+                    <button 
+                      onClick={() => updateUser(user._id || user.id, { role: user.role === 'admin' ? 'user' : 'admin' })} 
+                      className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                    >
                       Toggle Role
                     </button>
-                    <button onClick={() => updateUser(user._id || user.id, { isActive: !user.isActive })} className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                    <button 
+                      onClick={() => updateUser(user._id || user.id, { isActive: !user.isActive })} 
+                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
                       {user.isActive ? 'Deactivate' : 'Activate'}
                     </button>
                   </div>
@@ -229,7 +324,7 @@ export default function AdminDashboard() {
               </tr>
             )) : (
               <tr>
-                <td className="px-4 py-6 text-sm text-slate-500" colSpan="5">
+                <td className="px-4 py-6 text-sm text-slate-500" colSpan="6">
                   No users found.
                 </td>
               </tr>
