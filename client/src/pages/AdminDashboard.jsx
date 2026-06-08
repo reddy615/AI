@@ -81,37 +81,64 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleViewResume = (user) => {
-    if (!user?.resumeUrl) {
-      toast.error('No resume available')
+  const handleViewResume = async (user) => {
+    if (!user?._id) {
+      toast.error('User ID not found')
       return
     }
-    // Open in new tab using the secure proxy endpoint
-    window.open('/api/profile/resume/file', '_blank')
+
+    try {
+      // Fetch resume file as blob using authenticated admin endpoint
+      const response = await api.get(`/api/admin/users/${user._id}/resume`, {
+        responseType: 'blob',
+      })
+
+      // Create blob URL for inline viewing
+      const blobUrl = window.URL.createObjectURL(response)
+      
+      // Open in new tab (browser will render PDF inline if possible)
+      window.open(blobUrl, '_blank')
+
+      // Clean up blob URL after a short delay to ensure the new tab has loaded
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl)
+      }, 5000)
+
+      toast.success('Resume opened in new tab')
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Failed to view resume'
+      toast.error(message)
+      console.error('View error:', requestError)
+    }
   }
 
   const handleDownloadResume = async (user) => {
-    if (!user?.resumeUrl) {
-      toast.error('No resume available')
+    if (!user?._id) {
+      toast.error('User ID not found')
       return
     }
+
     try {
-      // Request the resume file with download flag
-      const response = await api.get('/api/profile/resume/file', {
+      // Fetch resume file as blob using authenticated admin endpoint with download flag
+      const response = await api.get(`/api/admin/users/${user._id}/resume`, {
         responseType: 'blob',
         params: { download: 'true' },
       })
+
+      // Create blob URL for download
+      const blobUrl = window.URL.createObjectURL(response)
       
-      // Create a download link
-      const url = window.URL.createObjectURL(response)
+      // Create temporary anchor element to trigger download
       const link = document.createElement('a')
-      link.href = url
+      link.href = blobUrl
       link.setAttribute('download', user.resumeFileName || 'resume.pdf')
       document.body.appendChild(link)
       link.click()
-      link.parentNode.removeChild(link)
-      window.URL.revokeObjectURL(url)
       
+      // Clean up
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+
       toast.success('Resume downloaded successfully')
     } catch (requestError) {
       const message = requestError.response?.data?.message || 'Failed to download resume'

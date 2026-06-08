@@ -10,6 +10,50 @@ const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
 
+// Helper functions for resume handling
+function isDownloadRequest(req) {
+  const value = String(req.query.download || '').toLowerCase();
+  return value === '1' || value === 'true';
+}
+
+function resolveResumeContentType({ remoteContentType, storedMimeType, filename, resumeUrl }) {
+  const remoteType = String(remoteContentType || '').toLowerCase();
+  const storedType = String(storedMimeType || '').toLowerCase();
+  const name = String(filename || resumeUrl || '').toLowerCase();
+
+  if (storedType) {
+    return storedMimeType;
+  }
+
+  if (name.endsWith('.pdf')) {
+    return 'application/pdf';
+  }
+
+  if (name.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+
+  if (name.endsWith('.doc')) {
+    return 'application/msword';
+  }
+
+  return remoteType || 'application/octet-stream';
+}
+
+function resolveResumeFilename(filename, contentType) {
+  let resolved = filename || 'Resume';
+  try {
+    if (!/\.[a-zA-Z0-9]+$/.test(resolved)) {
+      const type = String(contentType || '').toLowerCase();
+      if (type.includes('pdf')) resolved += '.pdf';
+      else if (type.includes('officedocument.wordprocessingml.document')) resolved += '.docx';
+      else if (type.includes('msword')) resolved += '.doc';
+    }
+  } catch (e) {}
+
+  return resolved.replace(/"/g, '');
+}
+
 function isMongoReady() {
   return mongoose.connection.readyState === 1;
 }
@@ -235,4 +279,64 @@ exports.getReports = asyncHandler(async (req, res) => {
     },
     'Platform reports loaded'
   );
+});
+
+exports.getUserResume = asyncHandler(async (req, res) => {
+  const { id: targetUserId } = req.params;
+
+  // Verify that the requesting user is an admin (middleware already checks this)
+  if (!isMongoReady()) {
+    return sendError(res, 'Database unavailable', 503);
+  }
+
+  // Fetch the target user's resume data
+  const targetUser = await User.findById(targetUserId).select('name email resumeUrl resumeFileName resumeMimeType').lean();
+  if (!targetUser) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  const resumeUrl = targetUser.resumeUrl || null;
+  if (!resumeUrl) {
+    return sendError(res, 'No resume available for this user', 404);
+  }
+
+  const forceDownload = isDownloadRequest(req);
+
+  // Fetch the remote resource and stream it back with correct headers
+  try {
+    const remoteResp = await fetch(resumeUrl);
+    if (!remoteResp.ok) {
+      return sendError(res, 'Failed to fetch resume file', 502);
+    }
+
+    const contentType = resolveResumeContentType({
+      remoteContentType: remoteResp.headers.get('content-type'),
+      storedMimeType: targetUser.resumeMimeType,
+      filename: targetUser.resumeFileName,
+      resumeUrl,
+    });
+    const safeFilename = resolveResumeFilename(targetUser.resumeFileName, contentType);
+
+    const disposition = forceDownload
+      ? `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`
+      : 'inline';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', disposition);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+
+    // Stream the response body to the client
+    const body = remoteResp.body;
+    if (body && typeof body.pipe === 'function') {
+      return body.pipe(res);
+    }
+
+    // Fallback: buffer and send
+    const buffer = await remoteResp.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('Error serving resume:', error);
+    return sendError(res, 'Failed to retrieve resume file', 500);
+  }
 });
