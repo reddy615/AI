@@ -83,6 +83,21 @@ const io = new Server(server, {
 registerInterviewSocket(io);
 app.set('io', io);
 
+// Early DB diagnostics (sanitized) — do not log credentials
+try {
+  const mongoose = require('mongoose');
+  const dbModule = require('./src/config/db');
+  const parsed = dbModule.parseMongoUri(process.env.MONGO_URI || '');
+  console.log('mongoose.readyState:', mongoose.connection.readyState);
+  console.log('sanitized cluster host:', parsed?.clusterHost || 'N/A');
+  console.log('sanitized db name:', parsed?.dbName || 'N/A');
+  console.log('authSource present:', parsed?.authSource ? true : false);
+  const railwayLoaded = Object.keys(process.env).some((k) => k.startsWith('RAILWAY_')) || Boolean(process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_ENV);
+  console.log('railway env detected:', Boolean(railwayLoaded));
+} catch (e) {
+  console.warn('[server.js] DB diagnostics unavailable:', e.message);
+}
+
 async function bootstrapServices() {
   if (!hasMongoUri) {
     console.warn('[server.js] MONGO_URI not set — skipping MongoDB connection.');
@@ -105,7 +120,7 @@ async function bootstrapServices() {
   const mongoReady = hasMongoUri && results.some((item) => item.status === 'fulfilled');
 
   if (hasMongoUri && !mongoReady) {
-    console.error('[server.js] MongoDB connection failed during startup. Exiting.');
+    console.error('[server.js] MongoDB connection failed during startup. Continuing in degraded mode to allow diagnostics.');
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.error('[server.js] Startup task failed:', {
@@ -115,7 +130,7 @@ async function bootstrapServices() {
         });
       }
     });
-    process.exit(1);
+    // Do not exit to allow debug endpoints to be reachable for diagnostics
   }
 
   if (mongoReady) {

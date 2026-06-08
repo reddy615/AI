@@ -114,6 +114,35 @@ app.get('/ready', (req, res) => {
 	});
 });
 
+// Temporary DB debug route (will be removed after diagnostics)
+app.get('/debug/db', (req, res) => {
+	try {
+		const mongoose = require('mongoose');
+		const { getDiagnostics } = require('./config/db');
+		const diag = getDiagnostics();
+
+		const readyStateMap = {
+			0: 'disconnected',
+			1: 'connected',
+			2: 'connecting',
+			3: 'disconnecting',
+		};
+
+		return res.status(200).json({
+			success: true,
+			connected: diag.connected,
+			readyState: diag.readyState,
+			readyStateDescription: readyStateMap[diag.readyState] || 'unknown',
+			clusterHost: diag.clusterHost || 'N/A',
+			dbName: diag.dbName || 'N/A',
+			authSource: diag.authSource || null,
+			railwayEnvDetected: diag.railwayEnvDetected,
+		});
+	} catch (e) {
+		return res.status(500).json({ success: false, message: 'DB diagnostics failed', details: e.message });
+	}
+});
+
 app.get('/metrics', async (req, res) => {
 	res.set('Content-Type', client.register.contentType);
 	res.end(await client.register.metrics());
