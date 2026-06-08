@@ -1,70 +1,78 @@
+const Resend = require('resend');
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_API_URL = 'https://api.resend.com/emails';
-const DEFAULT_FROM = 'AI Interview Team <support@aiinterviewplatform.com>';
+const DEFAULT_FROM =
+  process.env.EMAIL_FROM ||
+  (process.env.NODE_ENV && process.env.NODE_ENV !== 'production'
+    ? 'AI Interview Team <onboarding@resend.dev>'
+    : 'AI Interview Team <support@aiinterviewplatform.com>');
 
 function isResendConfigured() {
   return Boolean(RESEND_API_KEY && String(RESEND_API_KEY).trim());
 }
 
-async function sendEmail({ to, subject, html, from = DEFAULT_FROM }) {
-  if (!isResendConfigured()) {
-    throw new Error('Resend email service is not configured. Set RESEND_API_KEY in the environment.');
+let resendClient = null;
+if (isResendConfigured()) {
+  try {
+    resendClient = new Resend(RESEND_API_KEY);
+  } catch (e) {
+    // leave resendClient null and let sendEmail report configuration error
+    resendClient = null;
+  }
+}
+
+async function sendEmail({ to, subject, html, from = DEFAULT_FROM, cc, bcc, text }) {
+  if (!isResendConfigured() || !resendClient) {
+    const err = new Error('Resend email service is not configured. Set RESEND_API_KEY in the environment.');
+    err.code = 'ERR_EMAIL_NOT_CONFIGURED';
+    throw err;
   }
 
   if (!to) {
-    throw new Error('Email recipient is required.');
+    const err = new Error('Email recipient is required.');
+    err.code = 'ERR_EMAIL_NO_RECIPIENT';
+    throw err;
   }
 
   if (!subject) {
-    throw new Error('Email subject is required.');
+    const err = new Error('Email subject is required.');
+    err.code = 'ERR_EMAIL_NO_SUBJECT';
+    throw err;
   }
 
-  if (!html) {
-    throw new Error('Email html content is required.');
-  }
-
-  const payload = {
-    from,
-    to,
-    subject,
-    html,
-  };
-
-  let response;
-  let responseBody;
-
-  try {
-    response = await fetch(RESEND_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (fetchError) {
-    throw new Error(`Resend API request failed: ${fetchError.message}`);
+  if (!html && !text) {
+    const err = new Error('Email html or text content is required.');
+    err.code = 'ERR_EMAIL_NO_CONTENT';
+    throw err;
   }
 
   try {
-    responseBody = await response.text();
-  } catch (bodyError) {
-    throw new Error(`Unable to read Resend response: ${bodyError.message}`);
-  }
+    const payload = {
+      from,
+      to,
+      subject,
+    };
 
-  let parsedBody;
-  try {
-    parsedBody = JSON.parse(responseBody);
-  } catch {
-    parsedBody = null;
-  }
+    if (html) payload.html = html;
+    if (text) payload.text = text;
+    if (cc) payload.cc = cc;
+    if (bcc) payload.bcc = bcc;
 
-  if (!response.ok) {
-    const errorDetail = parsedBody?.error || parsedBody?.message || responseBody || response.statusText;
-    throw new Error(`Resend API error (${response.status}): ${errorDetail}`);
-  }
+    const result = await resendClient.emails.send(payload);
+    return result;
+  } catch (err) {
+    let details = null;
+    try {
+      details = err?.response?.data || err?.response || err?.message || String(err);
+    } catch (e) {
+      details = String(err);
+    }
 
-  return parsedBody || null;
+    const error = new Error(`Resend API error: ${details}`);
+    error.code = err?.code || 'ERR_RESEND_API';
+    error.details = details;
+    throw error;
+  }
 }
 
 module.exports = {

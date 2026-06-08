@@ -35,14 +35,24 @@ function recordReminderSent(userId) {
 async function sendResumeReminderEmail(user) {
   console.log('RESEND_API_KEY_PRESENT:', Boolean(process.env.RESEND_API_KEY));
   console.log('EMAIL_FROM:', EMAIL_FROM);
-
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #111; line-height: 1.6;">
-      <p>Hi ${user.name || 'Candidate'},</p>
-      <p>We are reviewing your profile and noticed that your resume has not been uploaded yet.</p>
-      <p>Please log in to the platform and upload your resume so our team can continue with your application process.</p>
-      <p>If you have any questions, simply reply to this email and we’ll be happy to assist.</p>
-      <p>Best regards,<br/>AI Interview Team</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color: #111; line-height: 1.6; max-width: 600px; margin:0 auto; padding:24px; background:#f7fafc;">
+      <table role="presentation" width="100%" style="background:#ffffff;border-radius:8px;padding:24px;border:1px solid #e6e9ee;">
+        <tr>
+          <td style="text-align:center;padding-bottom:12px;font-weight:600;color:#0f172a;font-size:18px;">AI Interview Team</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 0 8px;color:#0f172a;font-size:15px;">
+            <p style="margin:0 0 12px;">Hi ${user.name || 'Candidate'},</p>
+            <p style="margin:0 0 12px;color:#334155;">We're reviewing your profile and noticed your resume hasn't been uploaded yet. Uploading your resume helps us assess your background and match you to suitable opportunities.</p>
+            <p style="margin:0 0 12px;"><a href="${process.env.FRONTEND_BASE_URL || ''}" style="color:#1d4ed8;text-decoration:none;">Log in to your account</a> and upload your resume, or reply to this email if you need help.</p>
+            <p style="margin:0 0 4px;color:#334155;">Best regards,<br/>AI Interview Team</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:12px;font-size:12px;color:#94a3b8;text-align:center;">This is an automated reminder from AI Interview Platform. If you've already uploaded your resume, please disregard this message.</td>
+        </tr>
+      </table>
     </div>
   `;
 
@@ -458,6 +468,7 @@ exports.sendResumeReminder = asyncHandler(async (req, res) => {
     console.error('[ADMIN REMINDER] Error sending resume reminder:', error.stack || error.message || error);
     console.error('EMAIL ERROR:', error);
     const message = error?.message || 'Failed to send resume reminder email';
-    return sendError(res, message, 502);
+    const details = error?.details || null;
+    return sendError(res, message, 502, details);
   }
 });

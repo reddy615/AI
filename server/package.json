@@ -41,6 +41,8 @@
     "mammoth": "^1.4.21",
     "pdf-parse": "^1.1.1",
     "openai": "^4.10.0"
+    ,
+    "resend": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
