@@ -49,7 +49,7 @@ Go to: https://cloud.mongodb.com/
    - Download: https://www.mongodb.com/products/compass
    - Connection string:
      ```
-     mongodb+srv://2300090002_db_user:HxX7I5nxmXy53IQd@cluster0.2amgpzm.mongodb.net/?appName=Cluster0
+    mongodb+srv://<username>:***@cluster0.2amgpzm.mongodb.net/?appName=Cluster0
      ```
    - Click: Connect
    - Result: Should successfully connect to cluster

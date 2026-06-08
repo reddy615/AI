@@ -168,7 +168,7 @@ curl http://localhost:5000/health
 
 5. **Test with MongoDB Compass** (Desktop App)
    - Download: https://www.mongodb.com/products/compass
-   - Connection string: `mongodb+srv://2300090002_db_user:HxX7I5nxmXy53IQd@cluster0.2amgpzm.mongodb.net/?appName=Cluster0`
+   - Connection string: `mongodb+srv://<username>:***@cluster0.2amgpzm.mongodb.net/?appName=Cluster0`
    - If Compass connects: Problem is Node.js driver specific
    - If Compass fails too: Problem is cluster/credentials
 

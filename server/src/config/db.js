@@ -1,12 +1,15 @@
 const mongoose = require('mongoose');
 
 async function connectDB() {
-  const primaryUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ai-interview';
-  
+  console.log('Mongo URI exists:', !!process.env.MONGO_URI);
+
+  const primaryUri = process.env.MONGO_URI;
+  if (!primaryUri) {
+    throw new Error('MONGO_URI is not set in the environment');
+  }
+
   const isAtlas = primaryUri.includes('mongodb+srv');
-  const sanitizedUri = primaryUri.replace(/:[^:@]*@/, ':***@'); // hide password
-  const hostname = isAtlas ? 'MongoDB Atlas' : 'Local MongoDB';
-  
+
   const connectionOptions = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -24,10 +27,11 @@ async function connectDB() {
   }
 
   try {
-    await mongoose.connect(primaryUri, connectionOptions);
+    await mongoose.connect(process.env.MONGO_URI, connectionOptions);
+    console.log('MongoDB Connected');
     return { success: true, message: 'Connected to MongoDB' };
   } catch (error) {
-    console.error('[db.js] MongoDB connection failed:', error.message);
+    console.error('MongoDB Connection Error:', error.message);
     throw error;
   }
 }

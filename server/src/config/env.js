@@ -4,7 +4,7 @@ function loadEnv() {
   return cleanEnv(process.env, {
     NODE_ENV: str({ choices: ['development', 'test', 'production'], default: 'development' }),
     PORT: num({ default: 5000 }),
-    MONGO_URI: str({ default: 'mongodb://127.0.0.1:27017/ai-interview' }),
+    MONGO_URI: str({ default: '' }),
     JWT_SECRET: str({ default: 'dev_jwt_secret_change_me' }),
     ACCESS_TOKEN_SECRET: str({ default: 'dev_access_token_secret_change_me' }),
     REFRESH_TOKEN_SECRET: str({ default: 'dev_refresh_token_secret_change_me' }),

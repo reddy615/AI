@@ -96,7 +96,7 @@
 
 **Current Connection String**:
 ```
-mongodb+srv://2300090002_db_user:HxX7I5nxmXy53IQd@cluster0.2amgpzm.mongodb.net/?appName=Cluster0
+mongodb+srv://<username>:***@cluster0.2amgpzm.mongodb.net/?appName=Cluster0
 ```
 
 **Verify**:
@@ -162,7 +162,7 @@ This indicates a Node.js driver issue:
 
 ```javascript
 // Option A: Remove SRV, use direct connection
-const uri = 'mongodb://2300090002_db_user:HxX7I5nxmXy53IQd@cluster0-shard-00-00.2amgpzm.mongodb.net:27017,cluster0-shard-00-01.2amgpzm.mongodb.net:27017,cluster0-shard-00-02.2amgpzm.mongodb.net:27017/?ssl=true&replicaSet=atlas-75dd2y-shard-0&authSource=admin';
+const uri = 'mongodb://<username>:***@cluster0-shard-00-00.2amgpzm.mongodb.net:27017,cluster0-shard-00-01.2amgpzm.mongodb.net:27017,cluster0-shard-00-02.2amgpzm.mongodb.net:27017/?ssl=true&replicaSet=atlas-75dd2y-shard-0&authSource=admin';
 
 // Option B: Use MongoDB URI with explicit TLS options
 const options = {

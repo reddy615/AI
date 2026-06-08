@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 dotenv.config();
 const defaultMongoUri = 'mongodb://127.0.0.1:27017/ai-interview';
 const env = loadEnv();
+console.log('Mongo URI exists:', !!process.env.MONGO_URI);
 const mongoUri = String(env.MONGO_URI || '').trim();
 const isLocalMongoUri = !mongoUri
   || mongoUri === defaultMongoUri
@@ -102,6 +103,20 @@ async function bootstrapServices() {
 
   const results = await Promise.allSettled(startupTasks);
   const mongoReady = hasMongoUri && results.some((item) => item.status === 'fulfilled');
+
+  if (hasMongoUri && !mongoReady) {
+    console.error('[server.js] MongoDB connection failed during startup. Exiting.');
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error('[server.js] Startup task failed:', {
+          index,
+          reason: result.reason?.message || String(result.reason),
+          fullReason: result.reason,
+        });
+      }
+    });
+    process.exit(1);
+  }
 
   if (mongoReady) {
     try {
