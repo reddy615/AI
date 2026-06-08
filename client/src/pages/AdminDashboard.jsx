@@ -94,7 +94,7 @@ export default function AdminDashboard() {
       })
 
       // Create blob URL for inline viewing
-      const blobUrl = window.URL.createObjectURL(response)
+      const blobUrl = window.URL.createObjectURL(response.data)
       
       // Open in new tab (browser will render PDF inline if possible)
       window.open(blobUrl, '_blank')
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
     } catch (requestError) {
       const message = requestError.response?.data?.message || 'Failed to view resume'
       toast.error(message)
-      console.error('View error:', requestError)
+      console.error('View resume error:', requestError)
     }
   }
 
@@ -126,12 +126,13 @@ export default function AdminDashboard() {
       })
 
       // Create blob URL for download
-      const blobUrl = window.URL.createObjectURL(response)
+      const blobUrl = window.URL.createObjectURL(response.data)
       
       // Create temporary anchor element to trigger download
       const link = document.createElement('a')
       link.href = blobUrl
-      link.setAttribute('download', user.resumeFileName || 'resume.pdf')
+      const filename = user.resumeFileName || 'resume.pdf'
+      link.setAttribute('download', filename)
       document.body.appendChild(link)
       link.click()
       
@@ -143,7 +144,7 @@ export default function AdminDashboard() {
     } catch (requestError) {
       const message = requestError.response?.data?.message || 'Failed to download resume'
       toast.error(message)
-      console.error('Download error:', requestError)
+      console.error('Download resume error:', requestError)
     }
   }
 

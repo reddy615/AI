@@ -306,7 +306,7 @@ exports.getUserResume = asyncHandler(async (req, res) => {
   try {
     const remoteResp = await fetch(resumeUrl);
     if (!remoteResp.ok) {
-      return sendError(res, 'Failed to fetch resume file', 502);
+      return sendError(res, 'Failed to fetch resume file from storage', 502);
     }
 
     const contentType = resolveResumeContentType({
@@ -329,14 +329,26 @@ exports.getUserResume = asyncHandler(async (req, res) => {
     // Stream the response body to the client
     const body = remoteResp.body;
     if (body && typeof body.pipe === 'function') {
-      return body.pipe(res);
+      // Handle stream errors
+      body.on('error', (err) => {
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Stream error while reading resume' });
+        }
+      });
+      
+      res.on('error', (err) => {
+        // Handle response stream errors
+      });
+      
+      body.pipe(res);
+      return;
     }
 
     // Fallback: buffer and send
     const buffer = await remoteResp.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error('Error serving resume:', error);
+    console.error('Error serving admin resume:', error.message);
     return sendError(res, 'Failed to retrieve resume file', 500);
   }
 });
