@@ -9,14 +9,14 @@ const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
-const nodemailer = require('nodemailer');
+const { sendEmail, isResendConfigured, DEFAULT_FROM } = require('../utils/sendEmail');
 
 const emailReminderCooldownMap = new Map();
 const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
-const EMAIL_FROM = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+const EMAIL_FROM = DEFAULT_FROM;
 
 function isEmailConfigured() {
-  return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS && EMAIL_FROM);
+  return isResendConfigured();
 }
 
 function getReminderCooldownKey(userId) {
@@ -33,33 +33,22 @@ function recordReminderSent(userId) {
 }
 
 async function sendResumeReminderEmail(user) {
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000,
-  });
-
-  console.log('EMAIL_USER:', process.env.EMAIL_USER);
+  console.log('RESEND_API_KEY_PRESENT:', Boolean(process.env.RESEND_API_KEY));
   console.log('EMAIL_FROM:', EMAIL_FROM);
 
-  await transporter.verify();
-  console.log('SMTP connection successful');
-
   const html = `
-    <p>Hi ${user.name || 'Candidate'},</p>
-    <p>We are reviewing your profile and noticed that your resume is not yet uploaded.</p>
-    <p>Please log in to the platform and upload your resume so our team can continue with your application process.</p>
-    <p>If you have any questions, feel free to reply to this email.</p>
-    <p>Best regards,<br/>The AI Interview Team</p>
+    <div style="font-family: Arial, sans-serif; color: #111; line-height: 1.6;">
+      <p>Hi ${user.name || 'Candidate'},</p>
+      <p>We are reviewing your profile and noticed that your resume has not been uploaded yet.</p>
+      <p>Please log in to the platform and upload your resume so our team can continue with your application process.</p>
+      <p>If you have any questions, simply reply to this email and we’ll be happy to assist.</p>
+      <p>Best regards,<br/>AI Interview Team</p>
+    </div>
   `;
 
-  await transporter.sendMail({
+  await sendEmail({
     from: EMAIL_FROM,
     to: user.email,
-    replyTo: EMAIL_FROM,
     subject: 'Reminder: Please upload your resume',
     html,
   });
