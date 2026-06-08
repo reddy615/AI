@@ -7,8 +7,6 @@ async function connectDB() {
   const sanitizedUri = primaryUri.replace(/:[^:@]*@/, ':***@'); // hide password
   const hostname = isAtlas ? 'MongoDB Atlas' : 'Local MongoDB';
   
-  console.log('[db.js] Connecting to MongoDB...');
-
   const connectionOptions = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -27,7 +25,6 @@ async function connectDB() {
 
   try {
     await mongoose.connect(primaryUri, connectionOptions);
-    console.log('[db.js] MongoDB connected');
     return { success: true, message: 'Connected to MongoDB' };
   } catch (error) {
     console.error('[db.js] MongoDB connection failed:', error.message);

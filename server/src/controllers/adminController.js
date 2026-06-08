@@ -9,6 +9,59 @@ const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
+const nodemailer = require('nodemailer');
+
+const emailReminderCooldownMap = new Map();
+const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
+const EMAIL_SMTP_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
+const EMAIL_SMTP_PORT = Number(process.env.EMAIL_PORT) || 587;
+const EMAIL_SMTP_SECURE = String(process.env.EMAIL_SECURE || 'false').toLowerCase() === 'true';
+const EMAIL_FROM = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
+function isEmailConfigured() {
+  return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS && EMAIL_FROM);
+}
+
+function getReminderCooldownKey(userId) {
+  return `resume-reminder:${String(userId)}`;
+}
+
+function canSendReminder(userId) {
+  const lastSent = emailReminderCooldownMap.get(getReminderCooldownKey(userId));
+  return !lastSent || Date.now() - lastSent >= EMAIL_REMINDER_COOLDOWN_MS;
+}
+
+function recordReminderSent(userId) {
+  emailReminderCooldownMap.set(getReminderCooldownKey(userId), Date.now());
+}
+
+async function sendResumeReminderEmail(user) {
+  const transporter = nodemailer.createTransport({
+    host: EMAIL_SMTP_HOST,
+    port: EMAIL_SMTP_PORT,
+    secure: EMAIL_SMTP_SECURE,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const html = `
+    <p>Hi ${user.name || 'Candidate'},</p>
+    <p>We are reviewing your profile and noticed that your resume is not yet uploaded.</p>
+    <p>Please log in to the platform and upload your resume so our team can continue with your application process.</p>
+    <p>If you have any questions, feel free to reply to this email.</p>
+    <p>Best regards,<br/>The AI Interview Team</p>
+  `;
+
+  await transporter.sendMail({
+    from: EMAIL_FROM,
+    to: user.email,
+    replyTo: EMAIL_FROM,
+    subject: 'Reminder: Please upload your resume',
+    html,
+  });
+}
 
 // Helper functions for resume handling
 function isDownloadRequest(req) {
@@ -304,26 +357,12 @@ exports.getUserResume = asyncHandler(async (req, res) => {
 
   // Fetch the remote resource and stream it back with correct headers
   try {
-    console.log('[ADMIN RESUME] targetUserId=', targetUserId);
-    console.log('[ADMIN RESUME] targetUser=', {
-      id: targetUser._id,
-      email: targetUser.email,
-      name: targetUser.name,
-      resumeUrl: targetUser.resumeUrl,
-      resumeFileName: targetUser.resumeFileName,
-      resumeMimeType: targetUser.resumeMimeType,
-      forceDownload,
-    });
-
     const remoteResp = await fetch(resumeUrl);
-    console.log('[ADMIN RESUME] remote fetch status=', remoteResp.status, remoteResp.statusText);
-    console.log('[ADMIN RESUME] remote response headers=', Object.fromEntries(remoteResp.headers.entries()));
 
     if (!remoteResp.ok) {
       console.error('[ADMIN RESUME] Cloudinary fetch failed', {
         status: remoteResp.status,
         statusText: remoteResp.statusText,
-        resumeUrl,
       });
       return sendError(res, 'Failed to fetch resume file from storage', 502);
     }
@@ -340,10 +379,6 @@ exports.getUserResume = asyncHandler(async (req, res) => {
       ? `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`
       : 'inline';
 
-    console.log('[ADMIN RESUME] resolved contentType=', contentType);
-    console.log('[ADMIN RESUME] resolved filename=', safeFilename);
-    console.log('[ADMIN RESUME] content-disposition=', disposition);
-
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', disposition);
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -353,7 +388,6 @@ exports.getUserResume = asyncHandler(async (req, res) => {
     // Stream the response body to the client
     const body = remoteResp.body;
     if (body && typeof body.pipe === 'function') {
-      console.log('[ADMIN RESUME] using Node stream pipe for resume');
       body.on('error', (err) => {
         console.error('[ADMIN RESUME] body stream error', err.stack || err.message || err);
         if (!res.headersSent) {
@@ -370,7 +404,6 @@ exports.getUserResume = asyncHandler(async (req, res) => {
     }
 
     if (body && typeof body.getReader === 'function') {
-      console.log('[ADMIN RESUME] converting Web ReadableStream to Node stream');
       const { Readable } = require('stream');
       try {
         const nodeStream = Readable.fromWeb(body);
@@ -390,12 +423,48 @@ exports.getUserResume = asyncHandler(async (req, res) => {
       }
     }
 
-    console.log('[ADMIN RESUME] fallback to buffer send; body pipe not available');
     const buffer = await remoteResp.arrayBuffer();
-    console.log('[ADMIN RESUME] buffer length=', buffer.byteLength);
     res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('[ADMIN RESUME] Error serving admin resume:', error.stack || error.message || error);
     return sendError(res, 'Failed to retrieve resume file', 500);
+  }
+});
+
+exports.sendResumeReminder = asyncHandler(async (req, res) => {
+  const { id: targetUserId } = req.params;
+
+  if (!isMongoReady()) {
+    return sendError(res, 'Database unavailable', 503);
+  }
+
+  if (!isEmailConfigured()) {
+    return sendError(res, 'Email service is not configured', 500);
+  }
+
+  const targetUser = await User.findById(targetUserId).select('name email resumeUrl').lean();
+  if (!targetUser) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  if (targetUser.resumeUrl) {
+    return sendError(res, 'Cannot send reminder to a user who already uploaded a resume', 400);
+  }
+
+  if (!targetUser.email) {
+    return sendError(res, 'User email is missing', 400);
+  }
+
+  if (!canSendReminder(targetUserId)) {
+    return sendError(res, 'Reminder already sent recently. Please wait a moment before sending again.', 429);
+  }
+
+  try {
+    await sendResumeReminderEmail(targetUser);
+    recordReminderSent(targetUserId);
+    return res.apiSuccess({}, 'Reminder email sent successfully');
+  } catch (error) {
+    console.error('[ADMIN REMINDER] Error sending resume reminder:', error.stack || error.message || error);
+    return sendError(res, 'Failed to send resume reminder email', 502);
   }
 });

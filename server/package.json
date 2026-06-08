@@ -39,6 +39,7 @@
     "socket.io": "^4.7.5",
     "xss-clean": "^0.1.4",
     "mammoth": "^1.4.21",
+    "nodemailer": "^6.9.4",
     "pdf-parse": "^1.1.1",
     "openai": "^4.10.0"
   },

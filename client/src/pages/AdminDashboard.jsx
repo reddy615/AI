@@ -12,8 +12,23 @@ export default function AdminDashboard() {
   const [data, setData] = useState({ summary: null, users: [], questions: [], interviews: [], reports: null, leaderboard: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reminderLoading, setReminderLoading] = useState({})
   const { t } = useLanguage()
   const toast = useToast()
+
+  const parseBlobError = async (responseData, defaultMessage) => {
+    if (!(responseData instanceof Blob)) {
+      return defaultMessage
+    }
+
+    try {
+      const text = await responseData.text()
+      const parsed = JSON.parse(text)
+      return parsed.message || parsed.error || text || defaultMessage
+    } catch {
+      return responseData.type ? `${responseData.type} error` : defaultMessage
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -44,7 +59,6 @@ export default function AdminDashboard() {
         toast.error('Unable to load admin dashboard. Please try again later.')
       }
     } catch (requestError) {
-      console.error(requestError)
       const message = requestError.response?.data?.message || 'Unable to load admin data'
       setError(message)
       toast.error(message)
@@ -60,14 +74,16 @@ export default function AdminDashboard() {
   const metrics = useMemo(() => {
     if (!data.summary) return []
     return [
-      { label: 'Users', value: data.summary.userCount },
-      { label: 'Active', value: data.summary.activeUserCount },
-      { label: 'Questions', value: data.summary.questionCount + data.summary.aiQuestionCount },
-      { label: 'Sessions', value: data.summary.interviewCount },
-      { label: 'Attempts', value: data.summary.attemptCount + data.summary.codingCount },
-      { label: 'Avg XP', value: data.summary.averageXp },
+      { label: 'Users', value: data.summary.userCount ?? 0 },
+      { label: 'Active', value: data.summary.activeUserCount ?? 0 },
+      { label: 'Questions', value: (Number(data.summary.questionCount) || 0) + (Number(data.summary.aiQuestionCount) || 0) },
+      { label: 'Sessions', value: data.summary.interviewCount ?? 0 },
+      { label: 'Attempts', value: (Number(data.summary.attemptCount) || 0) + (Number(data.summary.codingCount) || 0) },
+      { label: 'Avg XP', value: data.summary.averageXp ?? 0 },
     ]
   }, [data.summary])
+
+  const [reminderLoading, setReminderLoading] = useState({})
 
   const updateUser = async (userId, payload) => {
     try {
@@ -81,6 +97,26 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleSendReminder = async (user) => {
+    const userId = user?._id || user?.id
+    if (!userId) {
+      toast.error('User ID not found')
+      return
+    }
+
+    setReminderLoading((prev) => ({ ...prev, [userId]: true }))
+    try {
+      await api.post(`/api/admin/users/${userId}/send-resume-reminder`)
+      toast.success('Reminder email sent successfully')
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to send reminder email'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setReminderLoading((prev) => ({ ...prev, [userId]: false }))
+    }
+  }
+
   const handleViewResume = async (user) => {
     const userId = user?._id || user?.id
     if (!userId) {
@@ -89,21 +125,19 @@ export default function AdminDashboard() {
     }
 
     try {
-      console.log('[ADMIN RESUME] view request for user=', userId, 'resumeFileName=', user.resumeFileName)
       // Fetch resume file as blob using authenticated admin endpoint
       const response = await api.get(`/api/admin/users/${userId}/resume`, {
         responseType: 'blob',
       })
 
-      console.log('[ADMIN RESUME] view response status=', response.status)
-      console.log('[ADMIN RESUME] view response headers=', response.headers)
-      console.log('[ADMIN RESUME] view blob type=', response.data?.type, 'size=', response.data?.size)
-
       // Create blob URL for inline viewing
       const blobUrl = window.URL.createObjectURL(response.data)
       
       // Open in new tab (browser will render PDF inline if possible)
-      window.open(blobUrl, '_blank')
+      const newTab = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+      if (newTab) {
+        newTab.focus()
+      }
 
       // Clean up blob URL after a short delay to ensure the new tab has loaded
       setTimeout(() => {
@@ -112,22 +146,9 @@ export default function AdminDashboard() {
 
       toast.success('Resume opened in new tab')
     } catch (requestError) {
-      console.error('[ADMIN RESUME] view caught error', requestError)
       let message = requestError.message || 'Failed to view resume'
       if (requestError.response) {
-        const responseData = requestError.response.data
-        if (responseData instanceof Blob) {
-          let text = ''
-          try {
-            text = await responseData.text()
-            const parsed = JSON.parse(text)
-            message = parsed.message || parsed.error || text || message
-          } catch (parseError) {
-            message = responseData.type ? `${responseData.type} error` : text || message
-          }
-        } else {
-          message = responseData?.message || message
-        }
+        message = await parseBlobError(requestError.response.data, message)
       }
       toast.error(message)
     }
@@ -141,16 +162,11 @@ export default function AdminDashboard() {
     }
 
     try {
-      console.log('[ADMIN RESUME] download request for user=', userId, 'resumeFileName=', user.resumeFileName)
       // Fetch resume file as blob using authenticated admin endpoint with download flag
       const response = await api.get(`/api/admin/users/${userId}/resume`, {
         responseType: 'blob',
         params: { download: 'true' },
       })
-
-      console.log('[ADMIN RESUME] download response status=', response.status)
-      console.log('[ADMIN RESUME] download response headers=', response.headers)
-      console.log('[ADMIN RESUME] download blob type=', response.data?.type, 'size=', response.data?.size)
 
       // Create blob URL for download
       const blobUrl = window.URL.createObjectURL(response.data)
@@ -166,28 +182,17 @@ export default function AdminDashboard() {
       document.body.appendChild(link)
       link.click()
       
-      // Clean up
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(blobUrl)
+      // Clean up after the browser has started processing the download
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 5000)
 
       toast.success('Resume downloaded successfully')
     } catch (requestError) {
-      console.error('[ADMIN RESUME] download caught error', requestError)
       let message = requestError.message || 'Failed to download resume'
       if (requestError.response) {
-        const responseData = requestError.response.data
-        if (responseData instanceof Blob) {
-          let text = ''
-          try {
-            text = await responseData.text()
-            const parsed = JSON.parse(text)
-            message = parsed.message || parsed.error || text || message
-          } catch (parseError) {
-            message = responseData.type ? `${responseData.type} error` : text || responseData?.toString() || message
-          }
-        } else {
-          message = responseData?.message || message
-        }
+        message = await parseBlobError(requestError.response.data, message)
       }
       toast.error(message)
     }
@@ -362,7 +367,7 @@ export default function AdminDashboard() {
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap gap-2">
-                    {user.hasResume && (
+                    {user.hasResume ? (
                       <>
                         <button 
                           onClick={() => handleViewResume(user)}
@@ -379,6 +384,14 @@ export default function AdminDashboard() {
                           Download
                         </button>
                       </>
+                    ) : (
+                      <button
+                        onClick={() => handleSendReminder(user)}
+                        disabled={Boolean(reminderLoading[user._id || user.id])}
+                        className="rounded-full bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {reminderLoading[user._id || user.id] ? 'Sending...' : 'Send Mail'}
+                      </button>
                     )}
                     <button 
                       onClick={() => updateUser(user._id || user.id, { role: user.role === 'admin' ? 'user' : 'admin' })} 

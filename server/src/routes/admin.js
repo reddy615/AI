@@ -9,6 +9,7 @@ router.use(auth, requireRole('admin'));
 router.get('/summary', adminController.getSummary);
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id', adminController.updateUser);
+router.post('/users/:id/send-resume-reminder', adminController.sendResumeReminder);
 router.get('/users/:id/resume', adminController.getUserResume);
 router.get('/questions', adminController.listQuestions);
 router.get('/interviews', adminController.listInterviews);

@@ -70,14 +70,7 @@ function getCorsOrigins() {
 }
 
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[server.js] Server running on port ${PORT}`);
-  console.log('[server.js] Environment:', {
-    NODE_ENV: env.NODE_ENV,
-    MONGO_URI_SET: Boolean(mongoUri),
-    REDIS_URL_SET: hasRedisUrl,
-  });
-});
+const server = app.listen(PORT, '0.0.0.0');
 
 const io = new Server(server, {
   cors: {
@@ -90,8 +83,6 @@ registerInterviewSocket(io);
 app.set('io', io);
 
 async function bootstrapServices() {
-  console.log('[server.js] Bootstrap starting');
-
   if (!hasMongoUri) {
     console.warn('[server.js] MONGO_URI not set — skipping MongoDB connection.');
   }
@@ -114,19 +105,13 @@ async function bootstrapServices() {
 
   if (mongoReady) {
     try {
-      const authUserSeedResults = await ensureAuthUsersSeeded();
-      if (authUserSeedResults.length) {
-        console.log('[server.js] Ensured authentication users exist in MongoDB:', authUserSeedResults);
-      }
+      await ensureAuthUsersSeeded();
     } catch (error) {
       console.warn('[server.js] Unable to ensure authentication users on startup:', error.message);
     }
 
     try {
-      const seedResult = await ensureCodingChallengesSeeded();
-      if (seedResult.seeded) {
-        console.log(`[server.js] Seeded ${seedResult.count} coding challenges`);
-      }
+      await ensureCodingChallengesSeeded();
     } catch (error) {
       console.warn('[server.js] Unable to auto-seed coding challenges on startup:', error.message);
     }
