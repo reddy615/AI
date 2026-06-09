@@ -14,7 +14,8 @@ const { connectRedis } = require('./src/config/redis');
 const { Server } = require('socket.io');
 
 console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-console.log('EMAIL_FROM exists:', !!process.env.EMAIL_FROM);
+console.log('MAIL_FROM exists:', !!process.env.MAIL_FROM);
+console.log('MAIL_FROM:', process.env.MAIL_FROM);
 if (!process.env.RESEND_API_KEY) {
   console.error('Missing RESEND_API_KEY in runtime environment');
 }

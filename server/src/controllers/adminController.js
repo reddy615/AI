@@ -9,14 +9,13 @@ const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
-const { sendEmail, isResendConfigured, DEFAULT_FROM } = require('../utils/sendEmail');
+const { sendEmail } = require('../utils/sendEmail');
 
 const emailReminderCooldownMap = new Map();
 const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
-const EMAIL_FROM = DEFAULT_FROM;
 
 function isEmailConfigured() {
-  return isResendConfigured();
+  return !!process.env.RESEND_API_KEY && !!process.env.MAIL_FROM;
 }
 
 function getReminderCooldownKey(userId) {
@@ -35,8 +34,9 @@ function recordReminderSent(userId) {
 async function sendResumeReminderEmail(user) {
   console.log('[EMAIL] Attempting to send resume reminder...');
   console.log('[EMAIL] RESEND_API_KEY_PRESENT:', Boolean(process.env.RESEND_API_KEY));
-  console.log('[EMAIL] EMAIL_FROM:', EMAIL_FROM);
+  console.log('[EMAIL] MAIL_FROM:', process.env.MAIL_FROM);
   console.log('[EMAIL] Recipient:', user.email);
+  console.log('Preparing reminder email for:', user.email);
   
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color: #111; line-height: 1.6; max-width: 600px; margin:0 auto; padding:24px; background:#f7fafc;">
@@ -60,13 +60,13 @@ async function sendResumeReminderEmail(user) {
   `;
 
   const result = await sendEmail({
-    from: EMAIL_FROM,
     to: user.email,
     subject: 'Reminder: Please upload your resume',
     html,
   });
   
-  console.log('[EMAIL] Resume reminder sent successfully. Email ID:', result.id);
+  console.log('[EMAIL] Resume reminder sent successfully. Response:', result);
+  console.log('Reminder email completed');
   return result;
 }
 

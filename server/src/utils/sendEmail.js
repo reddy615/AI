@@ -1,155 +1,55 @@
 const { Resend } = require('resend');
 
-function getMailProvider() {
-  return String(process.env.MAIL_PROVIDER || '').trim();
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-function getResendApiKey() {
-  return String(process.env.RESEND_API_KEY || '').trim();
-}
-
-function getDefaultFrom() {
-  const explicitFrom = String(process.env.EMAIL_FROM || '').trim();
-  if (explicitFrom) return explicitFrom;
-  return process.env.NODE_ENV && process.env.NODE_ENV !== 'production'
-    ? 'AI Interview Team <onboarding@resend.dev>'
-    : 'AI Interview Team <support@aiinterviewplatform.com>';
-}
-
-const DEFAULT_FROM = getDefaultFrom();
-
-let resendClient = null;
-function getResendClient() {
-  if (resendClient) return resendClient;
-  const apiKey = getResendApiKey();
-  if (!apiKey) return null;
-
+const sendEmail = async ({
+  to,
+  subject,
+  html,
+}) => {
   try {
-    resendClient = new Resend(apiKey);
-    return resendClient;
-  } catch (e) {
-    console.error('Failed to initialize Resend client:', e.message);
-    return null;
-  }
-}
+    console.log("========== EMAIL DEBUG START ==========");
+    console.log("MAIL_PROVIDER:", process.env.MAIL_PROVIDER);
+    console.log("RESEND_API_KEY exists:", !!process.env.RESEND_API_KEY);
+    console.log("MAIL_FROM:", process.env.MAIL_FROM);
+    console.log("Sending TO:", to);
 
-function isResendConfigured() {
-  return Boolean(getResendApiKey());
-}
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY missing");
+    }
 
-function validateMailProvider() {
-  const provider = getMailProvider();
-  
-  if (!provider) {
-    throw new Error("MAIL_PROVIDER is not configured");
-  }
-  
-  if (provider !== "resend") {
-    throw new Error(`Unsupported mail provider: ${provider}`);
-  }
-  
-  return provider;
-}
+    if (!process.env.MAIL_FROM) {
+      throw new Error("MAIL_FROM missing");
+    }
 
-async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
-  const provider = getMailProvider();
-  const apiKey = getResendApiKey();
-  const client = getResendClient();
-
-  console.log("MAIL_PROVIDER:", provider);
-
-  // Validate mail provider
-  try {
-    validateMailProvider();
-  } catch (err) {
-    console.error('Mail provider validation failed:', err.message);
-    throw err;
-  }
-
-  if (!apiKey || !client) {
-    console.error('Missing RESEND_API_KEY in runtime environment');
-    const err = new Error('Resend email service is not configured. Set RESEND_API_KEY in the environment.');
-    err.code = 'ERR_EMAIL_NOT_CONFIGURED';
-    throw err;
-  }
-
-  if (!to) {
-    const err = new Error('Email recipient is required.');
-    err.code = 'ERR_EMAIL_NO_RECIPIENT';
-    throw err;
-  }
-
-  if (!subject) {
-    const err = new Error('Email subject is required.');
-    err.code = 'ERR_EMAIL_NO_SUBJECT';
-    throw err;
-  }
-
-  if (!html && !text) {
-    const err = new Error('Email html or text content is required.');
-    err.code = 'ERR_EMAIL_NO_CONTENT';
-    throw err;
-  }
-
-  const senderEmail = from || getDefaultFrom();
-  console.log('Sending email to:', to);
-  console.log('Attempting Resend email...');
-  console.log('Recipient:', to);
-  console.log('Using sender:', senderEmail);
-
-  try {
-    const payload = {
-      from: senderEmail,
+    const response = await resend.emails.send({
+      from: process.env.MAIL_FROM,
       to,
       subject,
-    };
+      html,
+    });
 
-    if (html) payload.html = html;
-    if (text) payload.text = text;
-    if (cc) payload.cc = cc;
-    if (bcc) payload.bcc = bcc;
+    console.log("FULL RESEND RESPONSE:", JSON.stringify(response, null, 2));
 
-    console.log('Resend payload:', { from: payload.from, to: payload.to, subject: payload.subject });
-    
-    const response = await client.emails.send(payload);
-
-    console.log("RESEND RAW RESPONSE:", response);
-
-    if (!response) {
-      throw new Error("No response from Resend");
-    }
-
-    if (response.error) {
+    if (response?.error) {
       console.error("RESEND API ERROR:", response.error);
-      throw new Error(response.error.message || "Resend send failed");
+      throw new Error(
+        response.error.message || "Resend API failed"
+      );
     }
 
-    const messageId =
-      response?.data?.id ||
-      response?.id ||
-      null;
-
-    if (!messageId) {
-      console.warn("Resend response missing ID but send may still have succeeded");
-    } else {
-      console.log("Resend email accepted:", messageId);
-    }
+    console.log("EMAIL SENT SUCCESSFULLY");
+    console.log("========== EMAIL DEBUG END ==========");
 
     return response;
-  } catch (err) {
-    console.error('FINAL EMAIL ERROR:', err);
-    const error = new Error(err?.message || 'Email send failed');
-    error.code = 'ERR_RESEND_API';
-    error.details = err;
+  } catch (error) {
+    console.error("FINAL EMAIL SEND ERROR:", error);
+    console.log("========== EMAIL DEBUG END (WITH ERROR) ==========");
+
     throw error;
   }
-}
+};
 
 module.exports = {
   sendEmail,
-  isResendConfigured,
-  validateMailProvider,
-  getMailProvider,
-  DEFAULT_FROM,
-  getDefaultFrom,
 };
