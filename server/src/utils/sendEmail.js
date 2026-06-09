@@ -1,4 +1,4 @@
-const Resend = require('resend');
+const { Resend } = require('resend');
 
 function getResendApiKey() {
   return String(process.env.RESEND_API_KEY || '').trim();
