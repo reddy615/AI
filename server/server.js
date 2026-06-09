@@ -1,10 +1,24 @@
-const connectDB = require('./src/config/db');
+const path = require('path');
 const dotenv = require('dotenv');
+
+const dotenvResult = dotenv.config({ path: path.join(__dirname, '.env') });
+if (dotenvResult.error) {
+  console.warn('[server.js] dotenv load error:', dotenvResult.error.message);
+} else if (dotenvResult.parsed) {
+  console.log('[server.js] dotenv loaded keys:', Object.keys(dotenvResult.parsed).join(', '));
+}
+
+const connectDB = require('./src/config/db');
 const loadEnv = require('./src/config/env');
 const { connectRedis } = require('./src/config/redis');
 const { Server } = require('socket.io');
 
-dotenv.config();
+console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+console.log('EMAIL_FROM exists:', !!process.env.EMAIL_FROM);
+if (!process.env.RESEND_API_KEY) {
+  console.error('Missing RESEND_API_KEY in runtime environment');
+}
+
 const defaultMongoUri = 'mongodb://127.0.0.1:27017/ai-interview';
 const env = loadEnv();
 console.log('Mongo URI exists:', !!process.env.MONGO_URI);

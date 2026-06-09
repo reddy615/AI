@@ -1,28 +1,41 @@
 const Resend = require('resend');
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const DEFAULT_FROM =
-  process.env.EMAIL_FROM ||
-  (process.env.NODE_ENV && process.env.NODE_ENV !== 'production'
-    ? 'AI Interview Team <onboarding@resend.dev>'
-    : 'AI Interview Team <support@aiinterviewplatform.com>');
+function getResendApiKey() {
+  return String(process.env.RESEND_API_KEY || '').trim();
+}
 
-function isResendConfigured() {
-  return Boolean(RESEND_API_KEY && String(RESEND_API_KEY).trim());
+function getDefaultFrom() {
+  const explicitFrom = String(process.env.EMAIL_FROM || '').trim();
+  if (explicitFrom) return explicitFrom;
+  return process.env.NODE_ENV && process.env.NODE_ENV !== 'production'
+    ? 'AI Interview Team <onboarding@resend.dev>'
+    : 'AI Interview Team <support@aiinterviewplatform.com>';
 }
 
 let resendClient = null;
-if (isResendConfigured()) {
+function getResendClient() {
+  if (resendClient) return resendClient;
+  const apiKey = getResendApiKey();
+  if (!apiKey) return null;
+
   try {
-    resendClient = new Resend(RESEND_API_KEY);
+    resendClient = new Resend(apiKey);
+    return resendClient;
   } catch (e) {
-    // leave resendClient null and let sendEmail report configuration error
-    resendClient = null;
+    return null;
   }
 }
 
-async function sendEmail({ to, subject, html, from = DEFAULT_FROM, cc, bcc, text }) {
-  if (!isResendConfigured() || !resendClient) {
+function isResendConfigured() {
+  return Boolean(getResendApiKey());
+}
+
+async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
+  const apiKey = getResendApiKey();
+  const client = getResendClient();
+
+  if (!apiKey || !client) {
+    console.error('Missing RESEND_API_KEY in runtime environment');
     const err = new Error('Resend email service is not configured. Set RESEND_API_KEY in the environment.');
     err.code = 'ERR_EMAIL_NOT_CONFIGURED';
     throw err;
@@ -48,7 +61,7 @@ async function sendEmail({ to, subject, html, from = DEFAULT_FROM, cc, bcc, text
 
   try {
     const payload = {
-      from,
+      from: from || getDefaultFrom(),
       to,
       subject,
     };
@@ -58,7 +71,7 @@ async function sendEmail({ to, subject, html, from = DEFAULT_FROM, cc, bcc, text
     if (cc) payload.cc = cc;
     if (bcc) payload.bcc = bcc;
 
-    const result = await resendClient.emails.send(payload);
+    const result = await client.emails.send(payload);
     return result;
   } catch (err) {
     let details = null;
@@ -78,5 +91,4 @@ async function sendEmail({ to, subject, html, from = DEFAULT_FROM, cc, bcc, text
 module.exports = {
   sendEmail,
   isResendConfigured,
-  DEFAULT_FROM,
 };
