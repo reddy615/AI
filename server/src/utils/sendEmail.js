@@ -1,5 +1,9 @@
 const { Resend } = require('resend');
 
+function getMailProvider() {
+  return String(process.env.MAIL_PROVIDER || '').trim();
+}
+
 function getResendApiKey() {
   return String(process.env.RESEND_API_KEY || '').trim();
 }
@@ -33,9 +37,34 @@ function isResendConfigured() {
   return Boolean(getResendApiKey());
 }
 
+function validateMailProvider() {
+  const provider = getMailProvider();
+  
+  if (!provider) {
+    throw new Error("MAIL_PROVIDER is not configured");
+  }
+  
+  if (provider !== "resend") {
+    throw new Error(`Unsupported mail provider: ${provider}`);
+  }
+  
+  return provider;
+}
+
 async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
+  const provider = getMailProvider();
   const apiKey = getResendApiKey();
   const client = getResendClient();
+
+  console.log("MAIL_PROVIDER:", provider);
+
+  // Validate mail provider
+  try {
+    validateMailProvider();
+  } catch (err) {
+    console.error('Mail provider validation failed:', err.message);
+    throw err;
+  }
 
   if (!apiKey || !client) {
     console.error('Missing RESEND_API_KEY in runtime environment');
@@ -119,6 +148,8 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
 module.exports = {
   sendEmail,
   isResendConfigured,
+  validateMailProvider,
+  getMailProvider,
   DEFAULT_FROM,
   getDefaultFrom,
 };
