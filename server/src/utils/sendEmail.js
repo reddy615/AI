@@ -63,7 +63,8 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
   }
 
   const senderEmail = from || getDefaultFrom();
-  console.log('Sending email to:', to);
+  console.log('Attempting Resend email...');
+  console.log('Recipient:', to);
   console.log('Using sender:', senderEmail);
 
   try {
@@ -80,7 +81,19 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
 
     console.log('Resend payload:', { from: payload.from, to: payload.to, subject: payload.subject });
     const result = await client.emails.send(payload);
-    console.log('Email sent successfully:', result);
+    
+    console.log('RESEND RESPONSE:', result);
+    
+    // Check if Resend returned an error in the response
+    if (result.error) {
+      console.error('Resend API returned error in response:', result.error);
+      const error = new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+      error.code = 'ERR_RESEND_API_RESPONSE';
+      error.details = result.error;
+      throw error;
+    }
+    
+    console.log('Email send completed successfully. Email ID:', result.id);
     return result;
   } catch (err) {
     console.error('RESEND ERROR:', err);

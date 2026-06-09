@@ -33,8 +33,11 @@ function recordReminderSent(userId) {
 }
 
 async function sendResumeReminderEmail(user) {
-  console.log('RESEND_API_KEY_PRESENT:', Boolean(process.env.RESEND_API_KEY));
-  console.log('EMAIL_FROM:', EMAIL_FROM);
+  console.log('[EMAIL] Attempting to send resume reminder...');
+  console.log('[EMAIL] RESEND_API_KEY_PRESENT:', Boolean(process.env.RESEND_API_KEY));
+  console.log('[EMAIL] EMAIL_FROM:', EMAIL_FROM);
+  console.log('[EMAIL] Recipient:', user.email);
+  
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color: #111; line-height: 1.6; max-width: 600px; margin:0 auto; padding:24px; background:#f7fafc;">
       <table role="presentation" width="100%" style="background:#ffffff;border-radius:8px;padding:24px;border:1px solid #e6e9ee;">
@@ -56,12 +59,15 @@ async function sendResumeReminderEmail(user) {
     </div>
   `;
 
-  await sendEmail({
+  const result = await sendEmail({
     from: EMAIL_FROM,
     to: user.email,
     subject: 'Reminder: Please upload your resume',
     html,
   });
+  
+  console.log('[EMAIL] Resume reminder sent successfully. Email ID:', result.id);
+  return result;
 }
 
 // Helper functions for resume handling
@@ -435,40 +441,53 @@ exports.getUserResume = asyncHandler(async (req, res) => {
 exports.sendResumeReminder = asyncHandler(async (req, res) => {
   const { id: targetUserId } = req.params;
 
+  console.log('[ADMIN REMINDER] Request received for user:', targetUserId);
+
   if (!isMongoReady()) {
+    console.error('[ADMIN REMINDER] Database not ready');
     return sendError(res, 'Database unavailable', 503);
   }
 
   if (!isEmailConfigured()) {
+    console.error('[ADMIN REMINDER] Email service not configured');
     return sendError(res, 'Email service is not configured', 500);
   }
 
   const targetUser = await User.findById(targetUserId).select('name email resumeUrl').lean();
   if (!targetUser) {
+    console.error('[ADMIN REMINDER] User not found:', targetUserId);
     return sendError(res, 'User not found', 404);
   }
 
   if (targetUser.resumeUrl) {
+    console.warn('[ADMIN REMINDER] User already has resume:', targetUserId);
     return sendError(res, 'Cannot send reminder to a user who already uploaded a resume', 400);
   }
 
   if (!targetUser.email) {
+    console.error('[ADMIN REMINDER] User email missing:', targetUserId);
     return sendError(res, 'User email is missing', 400);
   }
 
   if (!canSendReminder(targetUserId)) {
+    console.warn('[ADMIN REMINDER] Rate limited:', targetUserId);
     return sendError(res, 'Reminder already sent recently. Please wait a moment before sending again.', 429);
   }
 
   try {
-    await sendResumeReminderEmail(targetUser);
+    console.log('[ADMIN REMINDER] Calling sendResumeReminderEmail for:', targetUser.email);
+    const emailResult = await sendResumeReminderEmail(targetUser);
+    console.log('[ADMIN REMINDER] sendResumeReminderEmail returned:', emailResult);
+    
     recordReminderSent(targetUserId);
+    console.log('[ADMIN REMINDER] Email sent successfully, cooldown recorded');
+    
     return res.apiSuccess({}, 'Reminder email sent successfully');
   } catch (error) {
     console.error('[ADMIN REMINDER] Error sending resume reminder:', error.stack || error.message || error);
-    console.error('EMAIL ERROR:', error);
+    console.error('[ADMIN REMINDER] Error details:', error);
     const message = error?.message || 'Failed to send resume reminder email';
     const details = error?.details || null;
-    return sendError(res, message, 502, details);
+    return res.status(500).json({ success: false, message, details });
   }
 });
