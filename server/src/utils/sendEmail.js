@@ -82,31 +82,31 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
 
     console.log('Resend payload:', { from: payload.from, to: payload.to, subject: payload.subject });
     
-    // STRICT VALIDATION: Call Resend API
     const response = await client.emails.send(payload);
-    
-    console.log('RESEND RAW RESPONSE:', response);
-    
-    // Validation 1: Check if we got a response at all
+
+    console.log("RESEND RAW RESPONSE:", response);
+
     if (!response) {
-      throw new Error('No response from Resend');
+      throw new Error("No response from Resend");
     }
-    
-    // Validation 2: Check for error in response
+
     if (response.error) {
-      console.error('RESEND API ERROR:', response.error);
-      throw new Error(response.error.message || 'Resend send failed');
+      console.error("RESEND API ERROR:", response.error);
+      throw new Error(response.error.message || "Resend send failed");
     }
-    
-    // Validation 3: Check for message ID in response.data
-    if (!response.data || !response.data.id) {
-      throw new Error('Resend did not return a message ID');
+
+    const messageId =
+      response?.data?.id ||
+      response?.id ||
+      null;
+
+    if (!messageId) {
+      console.warn("Resend response missing ID but send may still have succeeded");
+    } else {
+      console.log("Resend email accepted:", messageId);
     }
-    
-    console.log('Resend email accepted:', response.data.id);
-    console.log('Email send completed successfully');
-    
-    return response.data;
+
+    return response;
   } catch (err) {
     console.error('FINAL EMAIL ERROR:', err);
     const error = new Error(err?.message || 'Email send failed');
