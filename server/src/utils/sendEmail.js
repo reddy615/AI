@@ -63,6 +63,7 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
   }
 
   const senderEmail = from || getDefaultFrom();
+  console.log('Sending email to:', to);
   console.log('Attempting Resend email...');
   console.log('Recipient:', to);
   console.log('Using sender:', senderEmail);
@@ -80,33 +81,37 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
     if (bcc) payload.bcc = bcc;
 
     console.log('Resend payload:', { from: payload.from, to: payload.to, subject: payload.subject });
-    const result = await client.emails.send(payload);
     
-    console.log('RESEND RESPONSE:', result);
+    // STRICT VALIDATION: Call Resend API
+    const response = await client.emails.send(payload);
     
-    // Check if Resend returned an error in the response
-    if (result.error) {
-      console.error('Resend API returned error in response:', result.error);
-      const error = new Error(`Resend API error: ${JSON.stringify(result.error)}`);
-      error.code = 'ERR_RESEND_API_RESPONSE';
-      error.details = result.error;
-      throw error;
+    console.log('RESEND RAW RESPONSE:', response);
+    
+    // Validation 1: Check if we got a response at all
+    if (!response) {
+      throw new Error('No response from Resend');
     }
     
-    console.log('Email send completed successfully. Email ID:', result.id);
-    return result;
+    // Validation 2: Check for error in response
+    if (response.error) {
+      console.error('RESEND API ERROR:', response.error);
+      throw new Error(response.error.message || 'Resend send failed');
+    }
+    
+    // Validation 3: Check for message ID in response.data
+    if (!response.data || !response.data.id) {
+      throw new Error('Resend did not return a message ID');
+    }
+    
+    console.log('Resend email accepted:', response.data.id);
+    console.log('Email send completed successfully');
+    
+    return response.data;
   } catch (err) {
-    console.error('RESEND ERROR:', err);
-    let details = null;
-    try {
-      details = err?.response?.data || err?.response || err?.message || String(err);
-    } catch (e) {
-      details = String(err);
-    }
-
-    const error = new Error(`Resend API error: ${details}`);
-    error.code = err?.code || 'ERR_RESEND_API';
-    error.details = details;
+    console.error('FINAL EMAIL ERROR:', err);
+    const error = new Error(err?.message || 'Email send failed');
+    error.code = 'ERR_RESEND_API';
+    error.details = err;
     throw error;
   }
 }

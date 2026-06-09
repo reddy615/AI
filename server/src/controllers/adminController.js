@@ -479,15 +479,17 @@ exports.sendResumeReminder = asyncHandler(async (req, res) => {
     const emailResult = await sendResumeReminderEmail(targetUser);
     console.log('[ADMIN REMINDER] sendResumeReminderEmail returned:', emailResult);
     
+    // ONLY record cooldown AFTER email actually sends successfully
     recordReminderSent(targetUserId);
     console.log('[ADMIN REMINDER] Email sent successfully, cooldown recorded');
     
-    return res.apiSuccess({}, 'Reminder email sent successfully');
+    // ONLY return success AFTER all of the above completes
+    return res.apiSuccess({ emailId: emailResult.id }, 'Reminder email sent successfully');
   } catch (error) {
-    console.error('[ADMIN REMINDER] Error sending resume reminder:', error.stack || error.message || error);
-    console.error('[ADMIN REMINDER] Error details:', error);
+    console.error('[ADMIN REMINDER] FINAL EMAIL ERROR:', error.message || error);
+    console.error('[ADMIN REMINDER] Full error:', error);
     const message = error?.message || 'Failed to send resume reminder email';
-    const details = error?.details || null;
-    return res.status(500).json({ success: false, message, details });
+    // Return REAL backend error to frontend
+    return res.status(500).json({ success: false, message });
   }
 });
