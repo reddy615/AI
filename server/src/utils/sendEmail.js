@@ -12,6 +12,8 @@ function getDefaultFrom() {
     : 'AI Interview Team <support@aiinterviewplatform.com>';
 }
 
+const DEFAULT_FROM = getDefaultFrom();
+
 let resendClient = null;
 function getResendClient() {
   if (resendClient) return resendClient;
@@ -22,6 +24,7 @@ function getResendClient() {
     resendClient = new Resend(apiKey);
     return resendClient;
   } catch (e) {
+    console.error('Failed to initialize Resend client:', e.message);
     return null;
   }
 }
@@ -59,9 +62,13 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
     throw err;
   }
 
+  const senderEmail = from || getDefaultFrom();
+  console.log('Sending email to:', to);
+  console.log('Using sender:', senderEmail);
+
   try {
     const payload = {
-      from: from || getDefaultFrom(),
+      from: senderEmail,
       to,
       subject,
     };
@@ -71,9 +78,12 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
     if (cc) payload.cc = cc;
     if (bcc) payload.bcc = bcc;
 
+    console.log('Resend payload:', { from: payload.from, to: payload.to, subject: payload.subject });
     const result = await client.emails.send(payload);
+    console.log('Email sent successfully:', result);
     return result;
   } catch (err) {
+    console.error('RESEND ERROR:', err);
     let details = null;
     try {
       details = err?.response?.data || err?.response || err?.message || String(err);
@@ -91,4 +101,6 @@ async function sendEmail({ to, subject, html, from, cc, bcc, text }) {
 module.exports = {
   sendEmail,
   isResendConfigured,
+  DEFAULT_FROM,
+  getDefaultFrom,
 };
