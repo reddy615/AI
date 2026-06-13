@@ -1,3 +1,5 @@
+const { normalizeAssessmentAccess } = require('./assessmentAccess');
+
 function getResumeFileName(user) {
   if (!user) {
     return null;
@@ -37,6 +39,7 @@ function serializeUserProfile(user) {
     role: plainUser.role,
     preferredLanguage: plainUser.preferredLanguage || 'en',
     isActive: plainUser.isActive,
+    assessmentAccess: normalizeAssessmentAccess(plainUser.assessmentAccess),
     resume: resumeUrl,
     resumeUrl,
     resumeFileName: getResumeFileName(plainUser),

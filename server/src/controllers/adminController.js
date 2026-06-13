@@ -10,6 +10,11 @@ const MockInterviewSession = require('../models/MockInterviewSession');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
 const { sendEmail } = require('../utils/sendEmail');
+const {
+  normalizeAssessmentAccess,
+  mergeAssessmentAccess,
+  hasAnyAssessmentAccess,
+} = require('../utils/assessmentAccess');
 
 const emailReminderCooldownMap = new Map();
 const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
@@ -232,7 +237,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
     runAdminQuery(
       'users.list',
       () => User.find(query)
-        .select('name email role isActive preferredLanguage createdAt updatedAt resumeUrl resumeFileName resumeMimeType')
+        .select('name email role isActive assessmentAccess preferredLanguage createdAt updatedAt resumeUrl resumeFileName resumeMimeType')
         .sort({ createdAt: -1 })
         .skip((safePage - 1) * safeLimit)
         .limit(safeLimit)
@@ -265,6 +270,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
       resumeFileName: user.resumeFileName || null,
       resumeUploadedAt: user.resumeUrl ? user.updatedAt : null,
       hasResume: !!user.resumeUrl,
+      assessmentAccess: normalizeAssessmentAccess(user.assessmentAccess),
     };
   });
 
@@ -504,4 +510,66 @@ exports.sendResumeReminder = asyncHandler(async (req, res) => {
     // Return REAL backend error to frontend
     return res.status(500).json({ success: false, message });
   }
+});
+
+exports.getAssessmentAccess = asyncHandler(async (req, res) => {
+  if (!isMongoReady()) {
+    return sendError(res, 'Database unavailable', 503);
+  }
+
+  const user = await User.findById(req.params.id)
+    .select('name email assessmentAccess')
+    .lean();
+
+  if (!user) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  const assessmentAccess = normalizeAssessmentAccess(user.assessmentAccess);
+
+  return res.apiSuccess(
+    {
+      user: {
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+      },
+      assessmentAccess,
+      enabled: hasAnyAssessmentAccess(assessmentAccess),
+    },
+    'Assessment access loaded'
+  );
+});
+
+exports.updateAssessmentAccess = asyncHandler(async (req, res) => {
+  if (!isMongoReady()) {
+    return sendError(res, 'Database unavailable', 503);
+  }
+
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  const assessmentAccess = mergeAssessmentAccess(
+    user.assessmentAccess,
+    req.body.assessmentAccess
+  );
+
+  user.assessmentAccess = assessmentAccess;
+  user.markModified('assessmentAccess');
+  await user.save();
+
+  return res.apiSuccess(
+    {
+      user: {
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+      },
+      assessmentAccess,
+      enabled: hasAnyAssessmentAccess(assessmentAccess),
+    },
+    'Assessment access updated'
+  );
 });

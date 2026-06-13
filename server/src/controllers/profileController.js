@@ -4,6 +4,11 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendError } = require('../utils/apiResponse');
 const { uploadBuffer, deleteAsset, hasCloudinaryConfig } = require('../config/cloudinary');
 const { serializeUserProfile } = require('../utils/userProfile');
+const { findLocalUserById } = require('../config/localUsers');
+const {
+  normalizeAssessmentAccess,
+  hasAnyAssessmentAccess,
+} = require('../utils/assessmentAccess');
 
 function isDatabaseReady() {
   return mongoose.connection.readyState === 1;
@@ -72,6 +77,31 @@ exports.getProfile = asyncHandler(async (req, res) => {
   }
 
   return res.apiSuccess({ user: serializeUserProfile(user) }, 'Profile loaded');
+});
+
+exports.getAssessmentAccess = asyncHandler(async (req, res) => {
+  let user;
+
+  if (isDatabaseReady()) {
+    user = await User.findById(req.user.id).select('assessmentAccess role').lean();
+  } else {
+    user = findLocalUserById(req.user.id);
+  }
+
+  if (!user) {
+    return sendError(res, 'User not found', 404);
+  }
+
+  const assessmentAccess = normalizeAssessmentAccess(user.assessmentAccess);
+
+  return res.apiSuccess(
+    {
+      assessmentAccess,
+      enabled: req.user.role === 'admin' || hasAnyAssessmentAccess(assessmentAccess),
+      isAdmin: req.user.role === 'admin',
+    },
+    'Assessment access loaded'
+  );
 });
 
 exports.updatePreferences = asyncHandler(async (req, res) => {

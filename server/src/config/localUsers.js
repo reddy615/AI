@@ -7,6 +7,12 @@ const LOCAL_USERS = [
     role: 'admin',
     preferredLanguage: 'en',
     isActive: true,
+    assessmentAccess: {
+      technical: true,
+      aptitude: true,
+      coding: true,
+      mockInterview: true,
+    },
     refreshTokenVersion: 0,
   },
   {
@@ -17,6 +23,12 @@ const LOCAL_USERS = [
     role: 'user',
     preferredLanguage: 'en',
     isActive: true,
+    assessmentAccess: {
+      technical: false,
+      aptitude: false,
+      coding: false,
+      mockInterview: false,
+    },
     refreshTokenVersion: 0,
   },
 ]
@@ -47,6 +59,12 @@ function upsertLocalUser(user) {
     role: user.role || 'user',
     preferredLanguage: user.preferredLanguage || 'en',
     isActive: user.isActive !== false,
+    assessmentAccess: {
+      technical: user.assessmentAccess?.technical === true,
+      aptitude: user.assessmentAccess?.aptitude === true,
+      coding: user.assessmentAccess?.coding === true,
+      mockInterview: user.assessmentAccess?.mockInterview === true,
+    },
     refreshTokenVersion: typeof user.refreshTokenVersion === 'number' ? user.refreshTokenVersion : 0,
   }
 

@@ -1,18 +1,30 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
   BrainCircuit,
   Calculator,
   Code2,
+  LoaderCircle,
+  LockKeyhole,
   MessagesSquare,
   Sparkles,
   Target,
 } from 'lucide-react'
+import api from '../api/api'
+
+const emptyAssessmentAccess = {
+  technical: false,
+  aptitude: false,
+  coding: false,
+  mockInterview: false,
+}
 
 const assessments = [
   {
+    accessKey: 'technical',
     title: 'Technical Assessment',
     description:
       'Evaluate core computer science concepts, problem-solving skills, and technical fundamentals.',
@@ -23,6 +35,7 @@ const assessments = [
     badge: 'bg-cyan-400/10 text-cyan-300 ring-cyan-400/20',
   },
   {
+    accessKey: 'aptitude',
     title: 'Aptitude Assessment',
     description:
       'Practice quantitative aptitude, logical reasoning, and verbal ability in a focused test format.',
@@ -33,6 +46,7 @@ const assessments = [
     badge: 'bg-violet-400/10 text-violet-300 ring-violet-400/20',
   },
   {
+    accessKey: 'mockInterview',
     title: 'Mock Interview Assessment',
     description:
       'Build interview confidence with role-focused questions and structured performance feedback.',
@@ -43,6 +57,7 @@ const assessments = [
     badge: 'bg-amber-400/10 text-amber-300 ring-amber-400/20',
   },
   {
+    accessKey: 'coding',
     title: 'Coding Challenge Assessment',
     description:
       'Solve timed programming challenges designed to test implementation and algorithmic thinking.',
@@ -73,6 +88,48 @@ const cardVariants = {
 }
 
 export default function Assessment() {
+  const user = useSelector((state) => state.auth.user)
+  const [accessState, setAccessState] = useState({
+    permissions: {
+      ...emptyAssessmentAccess,
+      ...(user?.assessmentAccess || {}),
+    },
+    isAdmin: user?.role === 'admin',
+    loading: true,
+  })
+
+  useEffect(() => {
+    let active = true
+
+    const loadAssessmentAccess = async () => {
+      try {
+        const response = await api.get('/api/profile/assessment-access')
+        const payload = response.data?.data || response.data
+
+        if (active) {
+          setAccessState({
+            permissions: {
+              ...emptyAssessmentAccess,
+              ...(payload?.assessmentAccess || {}),
+            },
+            isAdmin: payload?.isAdmin === true,
+            loading: false,
+          })
+        }
+      } catch {
+        if (active) {
+          setAccessState((current) => ({ ...current, loading: false }))
+        }
+      }
+    }
+
+    loadAssessmentAccess()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   return (
     <section className="relative min-h-[calc(100vh-5rem)] overflow-hidden bg-slate-950 px-4 pb-20 pt-12 text-white sm:px-6 sm:pt-16 lg:px-8">
       <div className="pointer-events-none absolute inset-0">
@@ -110,13 +167,14 @@ export default function Assessment() {
         >
           {assessments.map((assessment) => {
             const Icon = assessment.icon
+            const hasAccess = accessState.isAdmin || accessState.permissions[assessment.accessKey]
 
             return (
               <motion.article
                 key={assessment.title}
                 variants={cardVariants}
                 whileHover={{ y: -6 }}
-                className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-black/10 backdrop-blur-sm transition-colors duration-300 hover:border-slate-700 sm:p-7"
+                className={`group relative overflow-hidden rounded-2xl border bg-slate-900/70 p-6 shadow-xl shadow-black/10 backdrop-blur-sm transition-colors duration-300 sm:p-7 ${hasAccess ? 'border-slate-800 hover:border-slate-700' : 'border-rose-400/20'}`}
               >
                 <div
                   className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${assessment.accent} opacity-70`}
@@ -143,21 +201,62 @@ export default function Assessment() {
                   </p>
                 </div>
 
+                {!accessState.loading && !hasAccess ? (
+                  <div className="mt-6 rounded-2xl border border-rose-400/15 bg-rose-400/5 p-4">
+                    <div className="flex items-center gap-2 font-semibold text-rose-300">
+                      <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                      Assessment Access Restricted
+                    </div>
+                    <p className="mt-2 text-sm leading-5 text-slate-400">
+                      You currently do not have access to this assessment. Please contact the administrator.
+                    </p>
+                  </div>
+                ) : null}
+
                 <div className="mt-7 flex flex-col gap-4 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <Target className="h-4 w-4" aria-hidden="true" />
-                    Skill focused
+                    {hasAccess ? (
+                      <>
+                        <Target className="h-4 w-4" aria-hidden="true" />
+                        Skill focused
+                      </>
+                    ) : (
+                      <>
+                        <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                        Admin approval required
+                      </>
+                    )}
                   </div>
-                  <Link
-                    to={assessment.href}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition-all duration-200 hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
-                  >
-                    Start Assessment
-                    <ArrowRight
-                      className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                      aria-hidden="true"
-                    />
-                  </Link>
+                  {accessState.loading ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex cursor-wait items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-400"
+                    >
+                      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Checking Access
+                    </button>
+                  ) : hasAccess ? (
+                    <Link
+                      to={assessment.href}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition-all duration-200 hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                    >
+                      Start Assessment
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-500"
+                    >
+                      <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                      Start Assessment
+                    </button>
+                  )}
                 </div>
               </motion.article>
             )

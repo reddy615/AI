@@ -5,10 +5,11 @@ const requireRole = require('../middleware/roles');
 const validateRequest = require('../middleware/validate');
 const { listChallengesValidator, runSubmissionValidator, getChallengeValidator, createChallengeValidator } = require('../validators/codingValidators');
 const codingController = require('../controllers/codingController');
+const { requireAssessmentAccess } = require('../middleware/assessmentAccess');
 
-router.get('/challenges', auth, listChallengesValidator, validateRequest, codingController.listChallenges);
-router.get('/challenges/:id', auth, getChallengeValidator, validateRequest, codingController.getChallenge);
-router.post('/run', auth, runSubmissionValidator, validateRequest, codingController.runSubmission);
+router.get('/challenges', auth, requireAssessmentAccess('coding'), listChallengesValidator, validateRequest, codingController.listChallenges);
+router.get('/challenges/:id', auth, requireAssessmentAccess('coding'), getChallengeValidator, validateRequest, codingController.getChallenge);
+router.post('/run', auth, requireAssessmentAccess('coding'), runSubmissionValidator, validateRequest, codingController.runSubmission);
 router.get('/leaderboard', auth, codingController.getLeaderboard);
 router.post('/challenges', auth, requireRole('admin'), createChallengeValidator, validateRequest, codingController.createChallenge);
 

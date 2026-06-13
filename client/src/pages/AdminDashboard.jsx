@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { LockKeyhole, ShieldCheck, X } from 'lucide-react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import LoadingOverlay from '../components/LoadingOverlay'
@@ -7,11 +9,45 @@ import { useLanguage } from '../context/LanguageContext'
 
 const tabs = ['overview', 'users', 'questions', 'interviews', 'reports']
 
+const emptyAssessmentAccess = {
+  technical: false,
+  aptitude: false,
+  coding: false,
+  mockInterview: false,
+}
+
+const assessmentOptions = [
+  {
+    key: 'technical',
+    title: 'Technical Assessment',
+    description: 'Core computer science and technical reasoning questions.',
+  },
+  {
+    key: 'aptitude',
+    title: 'Aptitude Assessment',
+    description: 'Quantitative aptitude, logical reasoning, and verbal ability.',
+  },
+  {
+    key: 'coding',
+    title: 'Coding Assessment',
+    description: 'Programming challenges and evaluated code submissions.',
+  },
+  {
+    key: 'mockInterview',
+    title: 'Mock Interview Assessment',
+    description: 'Role-focused AI mock interview sessions and feedback.',
+  },
+]
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [data, setData] = useState({ summary: null, users: [], questions: [], interviews: [], reports: null, leaderboard: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [assessmentAccessUser, setAssessmentAccessUser] = useState(null)
+  const [assessmentAccess, setAssessmentAccess] = useState(emptyAssessmentAccess)
+  const [assessmentAccessLoading, setAssessmentAccessLoading] = useState(false)
+  const [assessmentAccessSaving, setAssessmentAccessSaving] = useState(false)
   const { t } = useLanguage()
   const toast = useToast()
 
@@ -70,6 +106,25 @@ export default function AdminDashboard() {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    if (!assessmentAccessUser) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !assessmentAccessSaving) {
+        setAssessmentAccessUser(null)
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [assessmentAccessSaving, assessmentAccessUser])
+
   const metrics = useMemo(() => {
     if (!data.summary) return []
     return [
@@ -83,6 +138,79 @@ export default function AdminDashboard() {
   }, [data.summary])
 
   const [reminderLoading, setReminderLoading] = useState({})
+
+  const openAssessmentAccessModal = async (user) => {
+    const userId = user?._id || user?.id
+    if (!userId) {
+      toast.error('User ID not found')
+      return
+    }
+
+    setAssessmentAccessUser(user)
+    setAssessmentAccess({
+      ...emptyAssessmentAccess,
+      ...(user.assessmentAccess || {}),
+    })
+    setAssessmentAccessLoading(true)
+
+    try {
+      const response = await api.get(`/api/admin/users/${userId}/assessment-access`)
+      const payload = response.data?.data || response.data
+      setAssessmentAccess({
+        ...emptyAssessmentAccess,
+        ...(payload?.assessmentAccess || {}),
+      })
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to load assessment access'
+      toast.error(message)
+      setAssessmentAccessUser(null)
+    } finally {
+      setAssessmentAccessLoading(false)
+    }
+  }
+
+  const saveAssessmentAccess = async () => {
+    const userId = assessmentAccessUser?._id || assessmentAccessUser?.id
+    if (!userId) return
+
+    setAssessmentAccessSaving(true)
+    try {
+      const response = await api.put(`/api/admin/users/${userId}/assessment-access`, {
+        assessmentAccess,
+      })
+      const payload = response.data?.data || response.data
+      const updatedAccess = {
+        ...emptyAssessmentAccess,
+        ...(payload?.assessmentAccess || assessmentAccess),
+      }
+
+      setData((current) => ({
+        ...current,
+        users: current.users.map((user) => (
+          (user._id || user.id) === userId
+            ? { ...user, assessmentAccess: updatedAccess }
+            : user
+        )),
+      }))
+      setAssessmentAccess(updatedAccess)
+      setAssessmentAccessUser(null)
+      toast.success('Assessment access updated successfully')
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to save assessment access'
+      toast.error(message)
+    } finally {
+      setAssessmentAccessSaving(false)
+    }
+  }
+
+  const grantAllAssessments = () => {
+    setAssessmentAccess({
+      technical: true,
+      aptitude: true,
+      coding: true,
+      mockInterview: true,
+    })
+  }
 
   const updateUser = async (userId, payload) => {
     try {
@@ -318,10 +446,30 @@ export default function AdminDashboard() {
   )
 
   const renderUsers = () => (
-    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-[1.75rem] border border-cyan-400/20 bg-slate-950 p-6 text-white shadow-xl sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-cyan-400/10 p-2.5 text-cyan-300">
+                <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <h2 className="text-2xl font-bold">Assessment Access Management</h2>
+            </div>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              Control which technical, aptitude, coding, and mock interview assessments each user can start.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-slate-300">
+            <span className="font-semibold text-white">{data.users.length}</span> users loaded
+          </div>
+        </div>
+      </section>
+
+      <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h2 className="text-xl font-bold text-slate-900">User Management</h2>
-        <p className="text-sm text-slate-500">Promote admins, deactivate accounts, view resumes, or switch preference settings.</p>
+        <p className="text-sm text-slate-500">Manage roles, account status, resumes, email reminders, and assessment permissions.</p>
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
@@ -409,6 +557,13 @@ export default function AdminDashboard() {
                     >
                       {user.isActive ? 'Deactivate' : 'Activate'}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => openAssessmentAccessModal(user)}
+                      className="rounded-full bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-cyan-700"
+                    >
+                      Assessment Access
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -422,8 +577,151 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+      </div>
     </div>
   )
+
+  const renderAssessmentAccessModal = () => {
+    const accessEnabled = Object.values(assessmentAccess).some(Boolean)
+
+    return (
+      <AnimatePresence>
+        {assessmentAccessUser ? (
+          <motion.div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !assessmentAccessSaving) {
+                setAssessmentAccessUser(null)
+              }
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="assessment-access-title"
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 text-white shadow-2xl shadow-black/40"
+            >
+              <div className="flex items-start justify-between border-b border-slate-800 p-6 sm:p-7">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
+                    User permissions
+                  </p>
+                  <h2 id="assessment-access-title" className="mt-2 text-2xl font-bold">
+                    Assessment Access
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {assessmentAccessUser.name} · {assessmentAccessUser.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAssessmentAccessUser(null)}
+                  disabled={assessmentAccessSaving}
+                  className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                  aria-label="Close assessment access dialog"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-6 p-6 sm:p-7">
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`rounded-xl p-2.5 ${accessEnabled ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}>
+                      {accessEnabled
+                        ? <ShieldCheck className="h-5 w-5" />
+                        : <LockKeyhole className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-white">Assessment Access Status</div>
+                      <div className="text-xs text-slate-500">At least one permission must be enabled to start an assessment.</div>
+                    </div>
+                  </div>
+                  <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${accessEnabled ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}>
+                    {accessEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-white">Available Assessments</h3>
+                    <button
+                      type="button"
+                      onClick={grantAllAssessments}
+                      disabled={assessmentAccessLoading || assessmentAccessSaving}
+                      className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
+                    >
+                      Grant Access To All
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {assessmentOptions.map((assessment) => {
+                      const enabled = assessmentAccess[assessment.key]
+
+                      return (
+                        <div
+                          key={assessment.key}
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4"
+                        >
+                          <div>
+                            <div className="font-semibold text-slate-100">{assessment.title}</div>
+                            <div className="mt-1 text-sm leading-5 text-slate-500">{assessment.description}</div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={enabled}
+                            aria-label={`${enabled ? 'Revoke' : 'Grant'} ${assessment.title} access`}
+                            disabled={assessmentAccessLoading || assessmentAccessSaving}
+                            onClick={() => setAssessmentAccess((current) => ({
+                              ...current,
+                              [assessment.key]: !current[assessment.key],
+                            }))}
+                            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${enabled ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                          >
+                            <span
+                              className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`}
+                            />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-800 p-6 sm:flex-row sm:justify-end sm:p-7">
+                <button
+                  type="button"
+                  onClick={() => setAssessmentAccessUser(null)}
+                  disabled={assessmentAccessSaving}
+                  className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAssessmentAccess}
+                  disabled={assessmentAccessLoading || assessmentAccessSaving}
+                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:from-cyan-400 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {assessmentAccessSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    )
+  }
 
   const renderQuestions = () => (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -645,6 +943,7 @@ export default function AdminDashboard() {
       {activeTab === 'questions' && renderQuestions()}
       {activeTab === 'interviews' && renderInterviews()}
       {activeTab === 'reports' && renderReports()}
+      {renderAssessmentAccessModal()}
     </div>
   )
 }

@@ -117,7 +117,7 @@ export default function App() {
             <Route path="/quiz" element={<ProtectedRoute><PageTransition><Quiz /></PageTransition></ProtectedRoute>} />
             <Route path="/result/:id" element={<ProtectedRoute><PageTransition><Result /></PageTransition></ProtectedRoute>} />
             <Route path="/coding" element={<ProtectedRoute><PageTransition><CodingAssessment /></PageTransition></ProtectedRoute>} />
-            <Route path="/assessment" element={<PageTransition><Assessment /></PageTransition>} />
+            <Route path="/assessment" element={<ProtectedRoute><PageTransition><Assessment /></PageTransition></ProtectedRoute>} />
             <Route path="/ai" element={<ProtectedRoute><PageTransition><AIQuestionGenerator /></PageTransition></ProtectedRoute>} />
             <Route path="/interview" element={<ProtectedRoute><PageTransition><MockInterview /></PageTransition></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />

@@ -13,6 +13,12 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   preferredLanguage: { type: String, default: 'en' },
   isActive: { type: Boolean, default: true },
+  assessmentAccess: {
+    technical: { type: Boolean, default: false },
+    aptitude: { type: Boolean, default: false },
+    coding: { type: Boolean, default: false },
+    mockInterview: { type: Boolean, default: false },
+  },
   refreshTokenVersion: { type: Number, default: 0 },
 }, { timestamps: true });
 

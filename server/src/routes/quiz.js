@@ -5,11 +5,15 @@ const requireRole = require('../middleware/roles');
 const validateRequest = require('../middleware/validate');
 const { startQuizValidator, submitQuizValidator, createQuestionValidator } = require('../validators/quizValidators');
 const quiz = require('../controllers/quizController');
+const {
+  requireAssessmentAccess,
+  resolveQuizAssessment,
+} = require('../middleware/assessmentAccess');
 
 // Start a quiz (randomized questions) - public or auth depending on your policy
-router.get('/start', auth, startQuizValidator, validateRequest, quiz.startQuiz);
+router.get('/start', auth, requireAssessmentAccess(resolveQuizAssessment), startQuizValidator, validateRequest, quiz.startQuiz);
 // Submit answers and record attempt
-router.post('/submit', auth, submitQuizValidator, validateRequest, quiz.submitAnswers);
+router.post('/submit', auth, requireAssessmentAccess(resolveQuizAssessment), submitQuizValidator, validateRequest, quiz.submitAnswers);
 // Get user's attempt history
 router.get('/history', auth, quiz.getHistory);
 // Get attempt result/details

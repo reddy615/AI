@@ -2,7 +2,13 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const auth = require('../middleware/auth');
-const { uploadResume, getProfile, updatePreferences, deleteResume } = require('../controllers/profileController');
+const {
+  uploadResume,
+  getProfile,
+  getAssessmentAccess,
+  updatePreferences,
+  deleteResume,
+} = require('../controllers/profileController');
 
 const storage = multer.memoryStorage();
 
@@ -19,6 +25,7 @@ const upload = multer({
 });
 
 router.get('/', auth, getProfile);
+router.get('/assessment-access', auth, getAssessmentAccess);
 router.put('/preferences', auth, updatePreferences);
 router.post('/resume', auth, upload.single('resume'), uploadResume);
 router.delete('/resume', auth, deleteResume);
