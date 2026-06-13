@@ -46,10 +46,22 @@ async function sendResumeReminderEmail(user) {
         </tr>
         <tr>
           <td style="padding:12px 0 8px;color:#0f172a;font-size:15px;">
-            <p style="margin:0 0 12px;">Hi ${user.name || 'Candidate'},</p>
-            <p style="margin:0 0 12px;color:#334155;">We're reviewing your profile and noticed your resume hasn't been uploaded yet. Uploading your resume helps us assess your background and match you to suitable opportunities.</p>
-            <p style="margin:0 0 12px;"><a href="${process.env.FRONTEND_BASE_URL || ''}" style="color:#1d4ed8;text-decoration:none;">Log in to your account</a> and upload your resume, or reply to this email if you need help.</p>
-            <p style="margin:0 0 4px;color:#334155;">Best regards,<br/>AI Interview Team</p>
+            <p style="margin:0 0 12px;">Dear ${user.name || 'Candidate'},</p>
+            <p style="margin:0 0 12px;color:#334155;">We hope you are doing well.</p>
+            <p style="margin:0 0 12px;color:#334155;">We noticed that your resume has not yet been uploaded to the AI Interview Preparation Platform. Uploading your resume is an important step to unlock the full set of platform features and receive personalized interview preparation support.</p>
+            <p style="margin:0 0 12px;color:#334155;">By uploading your resume, you will be able to:</p>
+            <ul style="margin:0 0 12px; padding-left:18px; color:#334155;">
+              <li>Receive AI-powered resume analysis and ATS insights</li>
+              <li>Get personalized interview questions based on your profile</li>
+              <li>Access skill-gap recommendations and improvement suggestions</li>
+              <li>Track your interview readiness more effectively</li>
+              <li>Improve your chances of standing out during placements and recruitment drives</li>
+            </ul>
+            <p style="margin:0 0 12px;color:#334155;">We kindly request you to upload your resume at your earliest convenience to continue making the most of the platform.</p>
+            <p style="margin:0 0 12px;color:#334155;"><a href="${process.env.FRONTEND_BASE_URL || ''}" style="color:#1d4ed8;text-decoration:none;">Log in to your account</a> and upload your resume directly from the Resume section of the dashboard.</p>
+            <p style="margin:0 0 12px;color:#334155;">If you face any issues while uploading, feel free to contact our support team.</p>
+            <p style="margin:0 0 4px;color:#334155;">Thank you for being a part of the AI Interview Preparation Platform.</p>
+            <p style="margin:0 0 4px;color:#334155;">Best Regards,<br/>AI Interview Team</p>
           </td>
         </tr>
         <tr>
