@@ -1,41 +1,32 @@
+const mongoose = require('mongoose');
 const Attempt = require('../models/Attempt');
 const CodingAttempt = require('../models/CodingAttempt');
+const { localQuizAttemptStore } = require('../config/localQuizStore');
+const {
+  aggregateTopicAnalytics,
+  hydrateAttemptQuestionMetadata,
+} = require('./quizAnalyticsService');
 
 function calculateWeakAreas(attempts) {
-  const stats = new Map();
-
-  for (const attempt of attempts) {
-    for (const answer of attempt.answers || []) {
-      const topic = answer.topic || answer.questionId?.topic || 'General';
-      const current = stats.get(topic) || { correct: 0, wrong: 0, skipped: 0, total: 0 };
-      current.total += 1;
-      if (answer.selectedIndex === null || answer.selectedIndex === undefined) {
-        current.skipped += 1;
-      } else if (answer.selectedIndex === answer.correctIndex) {
-        current.correct += 1;
-      } else {
-        current.wrong += 1;
-      }
-      stats.set(topic, current);
-    }
-  }
-
-  return Array.from(stats.entries())
-    .map(([topic, value]) => ({
-      topic,
-      ...value,
-      accuracy: value.total ? Math.round((value.correct / value.total) * 100) : 0,
-    }))
-    .sort((a, b) => a.accuracy - b.accuracy);
+  return aggregateTopicAnalytics(attempts)
+    .sort((left, right) => left.accuracy - right.accuracy || left.topic.localeCompare(right.topic));
 }
 
 async function getUserAnalytics(userId) {
-  const [dbQuizAttempts, codingAttempts] = await Promise.all([
-    Attempt.find({ user: userId }).sort({ createdAt: 1 }).populate('answers.questionId').lean(),
-    CodingAttempt.find({ user: userId }).populate('challenge').sort({ createdAt: -1 }).lean(),
-  ]);
+  let storedQuizAttempts = [];
+  let codingAttempts = [];
 
-  const quizAttempts = dbQuizAttempts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  if (mongoose.connection.readyState === 1) {
+    [storedQuizAttempts, codingAttempts] = await Promise.all([
+      Attempt.find({ $or: [{ user: userId }, { userId }] }).sort({ createdAt: 1 }).lean(),
+      CodingAttempt.find({ user: userId }).populate('challenge').sort({ createdAt: -1 }).lean(),
+    ]);
+  }
+
+  const localQuizAttempts = Array.from(localQuizAttemptStore.values())
+    .filter((attempt) => String(attempt.user || attempt.userId) === String(userId));
+  const quizAttempts = await hydrateAttemptQuestionMetadata([...storedQuizAttempts, ...localQuizAttempts]);
+  quizAttempts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   const quizScores = quizAttempts.map((attempt) => ({
     date: attempt.createdAt,
@@ -47,11 +38,12 @@ async function getUserAnalytics(userId) {
   }));
 
   const moduleBreakdown = quizAttempts.reduce((accumulator, attempt) => {
-    const current = accumulator[attempt.module] || { attempts: 0, score: 0, correct: 0, wrong: 0 };
+    const current = accumulator[attempt.module] || { attempts: 0, score: 0, correct: 0, wrong: 0, skipped: 0 };
     current.attempts += 1;
     current.score += attempt.score || 0;
     current.correct += attempt.correctCount || 0;
     current.wrong += attempt.wrongCount || 0;
+    current.skipped += attempt.skippedCount || 0;
     accumulator[attempt.module] = current;
     return accumulator;
   }, {});
@@ -79,18 +71,24 @@ async function getUserAnalytics(userId) {
       language: attempt.language,
     }));
 
-  const weakAreas = calculateWeakAreas(quizAttempts).slice(0, 5);
-  const accuracy = quizAttempts.length
-    ? Math.round(
-        quizAttempts.reduce((sum, attempt) => sum + ((attempt.correctCount || 0) / Math.max(attempt.totalQuestions || 1, 1)), 0) /
-          quizAttempts.length * 100
-      )
-    : 0;
+  const topicAnalytics = aggregateTopicAnalytics(quizAttempts);
+  const weakAreas = [...topicAnalytics]
+    .sort((left, right) => left.accuracy - right.accuracy || left.topic.localeCompare(right.topic))
+    .slice(0, 5);
+  const totalCorrect = quizAttempts.reduce((sum, attempt) => sum + (attempt.correctCount || 0), 0);
+  const totalQuestions = quizAttempts.reduce((sum, attempt) => (
+    sum + Math.max(
+      attempt.totalQuestions || 0,
+      (attempt.correctCount || 0) + (attempt.wrongCount || 0) + (attempt.skippedCount || 0)
+    )
+  ), 0);
+  const accuracy = totalQuestions ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
   return {
     quizAttempts,
     quizScores,
     moduleBreakdown,
+    topicAnalytics,
     codingHistory,
     codingLeaderboard,
     weakAreas,

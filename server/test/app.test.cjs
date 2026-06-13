@@ -1,6 +1,10 @@
 const assert = require('node:assert');
 const http = require('node:http');
 const { test, before, after } = require('node:test');
+
+process.env.RESEND_API_KEY ||= 're_test_key';
+process.env.MAIL_FROM ||= 'test@example.com';
+
 const app = require('../src/app');
 
 let server;

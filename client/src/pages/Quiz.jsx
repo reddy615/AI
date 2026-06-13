@@ -12,6 +12,7 @@ export default function Quiz(){
   const module = params.get('module') || 'aptitude'
   const count = params.get('count') || 10
   const difficulty = params.get('difficulty') || ''
+  const category = params.get('category') || ''
   const navigate = useNavigate()
 
   const [questions, setQuestions] = useState([])
@@ -26,14 +27,14 @@ export default function Quiz(){
   useEffect(()=>{
     (async ()=>{
       try{
-        const res = await api.get(`/api/quiz/start?module=${module}&count=${count}${difficulty?`&difficulty=${difficulty}`:''}`)
+        const res = await api.get(`/api/quiz/start?module=${module}&count=${count}${difficulty?`&difficulty=${difficulty}`:''}${category?`&category=${encodeURIComponent(category)}`:''}`)
         setQuestions(res.data.questions)
         setLoading(false)
         setIndex(0)
         setAnswers({})
       }catch(err){ console.error(err); setLoading(false) }
     })()
-  },[location.search, module, count, difficulty])
+  },[location.search, module, count, difficulty, category])
 
   const handleSelect = (qid, optionIndex)=>{
     setAnswers(prev=>({ ...prev, [qid]: optionIndex }))
@@ -44,7 +45,7 @@ export default function Quiz(){
     const normalizedAnswers = Object.fromEntries(
       questions.map((question) => [question.id, Object.prototype.hasOwnProperty.call(answers, question.id) ? answers[question.id] : null])
     )
-    const payload = { module, difficulty, answers: normalizedAnswers, durationSeconds: elapsedSeconds, remainingSeconds: duration, totalDurationSeconds: totalDuration }
+    const payload = { module, difficulty, category, answers: normalizedAnswers, durationSeconds: elapsedSeconds, remainingSeconds: duration, totalDurationSeconds: totalDuration }
     try{
       const res = await api.post('/api/quiz/submit', payload)
       navigate(`/result/${res.data.attemptId}`)

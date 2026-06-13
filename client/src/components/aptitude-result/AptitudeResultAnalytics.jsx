@@ -566,7 +566,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
           <section className="space-y-4">
             <SectionHeading
               eyebrow="Topic analytics"
-              title="18-topic performance grid"
+              title={`${model.topicCards.length}-topic performance grid`}
               subtitle="Every topic is shown as a premium card with its own accuracy, score, progress bar, and sparkline."
               icon={RadarIcon}
             />

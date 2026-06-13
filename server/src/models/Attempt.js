@@ -2,14 +2,24 @@ const mongoose = require('mongoose');
 
 const answerSchema = new mongoose.Schema({
   questionId: { type: mongoose.Schema.Types.Mixed },
-  selectedIndex: { type: Number },
+  questionText: { type: String },
+  module: { type: String },
+  category: { type: String },
+  topic: { type: String },
+  selectedIndex: { type: Number, default: null },
+  selectedAnswer: { type: String, default: null },
   correctIndex: { type: Number },
-  marks: { type: Number },
-  negativeMarks: { type: Number }
+  correctAnswer: { type: String, default: null },
+  isCorrect: { type: Boolean },
+  isSkipped: { type: Boolean },
+  marks: { type: Number, default: 0 },
+  negativeMarks: { type: Number, default: 0 },
+  score: { type: Number }
 }, { _id: false });
 
 const attemptSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   module: { type: String },
   difficulty: { type: String },
   category: { type: String },
