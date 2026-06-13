@@ -2,6 +2,28 @@ const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const buildPlainText = (html) => {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li>/gi, '- ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const formatFromAddress = (from) => {
+  if (!from) return from;
+  const trimmed = String(from).trim();
+  if (trimmed.includes('<') && trimmed.includes('>')) {
+    return trimmed;
+  }
+  return `AI Interview Team <${trimmed}>`;
+};
+
 const sendEmail = async ({
   to,
   subject,
@@ -23,10 +45,12 @@ const sendEmail = async ({
     }
 
     const response = await resend.emails.send({
-      from: process.env.MAIL_FROM,
+      from: formatFromAddress(process.env.MAIL_FROM),
       to,
       subject,
       html,
+      text: buildPlainText(html),
+      reply_to: process.env.MAIL_FROM,
     });
 
     console.log("FULL RESEND RESPONSE:", JSON.stringify(response, null, 2));
@@ -38,7 +62,7 @@ const sendEmail = async ({
       );
     }
 
-    console.log("EMAIL SENT SUCCESSFULLY");
+    console.log("EMAIL SENT SUCCESSFULLY", { emailId: response?.id, status: response?.status });
     console.log("========== EMAIL DEBUG END ==========");
 
     return response;
