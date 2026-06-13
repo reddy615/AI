@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from "react-router-dom";
 
 const socialLinks = [
   { label: 'Twitter', href: '#' },
@@ -37,10 +37,10 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-white">Company</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#" className="hover:text-cyan-400 transition">About</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Blog</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Careers</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Contact</a></li>
+              <li><Link to="/about" className="hover:text-cyan-400 transition">About</Link></li>
+              <li><Link to="/blog" className="hover:text-cyan-400 transition">Blog</Link></li>
+              <li><Link to="/careers" className="hover:text-cyan-400 transition">Careers</Link></li>
+              <li><Link to="/contact" className="hover:text-cyan-400 transition">Contact</Link></li>
             </ul>
           </div>
 
@@ -57,7 +57,7 @@ export default function Footer() {
 
         <div className="border-t border-slate-800 pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-slate-400 text-sm">© 2024 AI Interview Platform. All rights reserved.</p>
+            <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} AI Interview Platform. All rights reserved.</p>
             <div className="flex flex-wrap gap-4">
               {socialLinks.map((social) => (
                 <a key={social.label} href={social.href} className="text-slate-400 hover:text-cyan-400 transition text-sm">

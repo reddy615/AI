@@ -19,6 +19,10 @@ import MockInterview from './pages/MockInterview'
 import ProtectedRoute from './components/ProtectedRoute'
 import GrowthDashboard from './pages/GrowthDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import About from './pages/About'
+import Blog from './pages/Blog'
+import Careers from './pages/Careers'
+import Contact from './pages/Contact'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import PageTransition from './components/PageTransition'
 import Footer from './components/Footer'
@@ -33,6 +37,10 @@ export default function App() {
   const user = useSelector((s) => s.auth.user)
   const token = useSelector((s) => s.auth.token)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   useEffect(() => {
     console.log('[App] mounted, bootstrapping auth with token:', !!token)
@@ -86,6 +94,10 @@ export default function App() {
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={!token ? <PageTransition><Home /></PageTransition> : <Navigate to="/dashboard" replace />} />
+            <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+            <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
+            <Route path="/careers" element={<PageTransition><Careers /></PageTransition>} />
+            <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
             <Route path="/login" element={!token ? <PageTransition><Login /></PageTransition> : <Navigate to="/dashboard" replace />} />
             <Route path="/register" element={!token ? <PageTransition><Register /></PageTransition> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
