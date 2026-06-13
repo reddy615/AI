@@ -28,6 +28,7 @@ export default function Navigation({ user, onLogout }) {
     { label: 'Resume', href: '/resume' },
     { label: 'Mock Interview', href: '/interview' },
     { label: 'Coding Lab', href: '/coding' },
+    { label: 'Assessment', href: '/assessment' },
   ]
 
   const isActiveNavItem = (href) => {
@@ -81,7 +82,7 @@ export default function Navigation({ user, onLogout }) {
             </Link>
 
             {/* Desktop Menu */}
-            <div className="hidden items-center gap-8 md:flex">
+            <div className="hidden items-center gap-8 xl:flex">
               {navItems.map((item) => (
                 <motion.div
                   key={item.href}
@@ -137,7 +138,7 @@ export default function Navigation({ user, onLogout }) {
               {/* Mobile menu button */}
               <motion.button
                 onClick={() => setIsOpen(!isOpen)}
-                className="md:hidden p-2 text-slate-400 hover:text-white"
+                className="p-2 text-slate-400 hover:text-white xl:hidden"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -155,7 +156,7 @@ export default function Navigation({ user, onLogout }) {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 top-20 z-40 bg-slate-950 md:hidden"
+            className="fixed inset-0 top-20 z-40 bg-slate-950 xl:hidden"
           >
             <div className="space-y-2 px-4 py-6">
               {navItems.map((item) => (

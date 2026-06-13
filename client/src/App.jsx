@@ -14,6 +14,7 @@ import Quiz from './pages/Quiz'
 import Result from './pages/Result'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
 import CodingAssessment from './pages/CodingAssessment'
+import Assessment from './pages/Assessment'
 import AIQuestionGenerator from './pages/AIQuestionGenerator'
 import MockInterview from './pages/MockInterview'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -116,6 +117,7 @@ export default function App() {
             <Route path="/quiz" element={<ProtectedRoute><PageTransition><Quiz /></PageTransition></ProtectedRoute>} />
             <Route path="/result/:id" element={<ProtectedRoute><PageTransition><Result /></PageTransition></ProtectedRoute>} />
             <Route path="/coding" element={<ProtectedRoute><PageTransition><CodingAssessment /></PageTransition></ProtectedRoute>} />
+            <Route path="/assessment" element={<PageTransition><Assessment /></PageTransition>} />
             <Route path="/ai" element={<ProtectedRoute><PageTransition><AIQuestionGenerator /></PageTransition></ProtectedRoute>} />
             <Route path="/interview" element={<ProtectedRoute><PageTransition><MockInterview /></PageTransition></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />
