@@ -33,6 +33,7 @@ const sendEmail = async ({
     console.log("========== EMAIL DEBUG START ==========");
     console.log("MAIL_PROVIDER:", process.env.MAIL_PROVIDER);
     console.log("RESEND_API_KEY exists:", !!process.env.RESEND_API_KEY);
+    console.log("RESEND_API_KEY prefix:", process.env.RESEND_API_KEY?.substring(0, 10));
     console.log("MAIL_FROM:", process.env.MAIL_FROM);
     console.log("Sending TO:", to);
 
@@ -44,22 +45,37 @@ const sendEmail = async ({
       throw new Error("MAIL_FROM missing");
     }
 
-    const response = await resend.emails.send({
-      from: formatFromAddress(process.env.MAIL_FROM),
+    const fromAddress = formatFromAddress(process.env.MAIL_FROM);
+    console.log("Formatted FROM address:", fromAddress);
+
+    const emailPayload = {
+      from: fromAddress,
       to,
       subject,
       html,
       text: buildPlainText(html),
-      reply_to: process.env.MAIL_FROM,
-    });
+      reply_to: fromAddress,
+    };
+    
+    console.log("Email payload keys:", Object.keys(emailPayload));
+    console.log("About to call resend.emails.send()");
+    
+    const response = await resend.emails.send(emailPayload);
 
     console.log("FULL RESEND RESPONSE:", JSON.stringify(response, null, 2));
 
     if (response?.error) {
       console.error("RESEND API ERROR:", response.error);
+      console.error("RESEND ERROR MESSAGE:", response.error.message);
+      console.error("RESEND ERROR DETAILS:", JSON.stringify(response.error, null, 2));
       throw new Error(
-        response.error.message || "Resend API failed"
+        `Resend API failed: ${response.error.message || 'Unknown error'}`
       );
+    }
+
+    if (!response?.id) {
+      console.warn("Resend response missing email ID:", response);
+      throw new Error("Resend did not return an email ID");
     }
 
     console.log("EMAIL SENT SUCCESSFULLY", { emailId: response?.id, status: response?.status });
@@ -67,7 +83,8 @@ const sendEmail = async ({
 
     return response;
   } catch (error) {
-    console.error("FINAL EMAIL SEND ERROR:", error);
+    console.error("FINAL EMAIL SEND ERROR:", error.message);
+    console.error("FULL ERROR STACK:", error.stack);
     console.log("========== EMAIL DEBUG END (WITH ERROR) ==========");
 
     throw error;
