@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/api'
 import ATSCard from '../components/resumeAnalytics/ATSCard'
@@ -41,21 +41,24 @@ export default function ResumeAnalytics() {
   const cancelExportRef = useRef(false)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true)
-        const resp = await api.get('/api/resume/history')
-        const items = resp?.data?.data || resp?.data || []
-        setAnalyses(items)
-        setSelected(items[0] || null)
-      } catch (e) {
-        console.error(e)
-        toast.error('Unable to load resume analytics. Please refresh the page.')
-      } finally { setLoading(false) }
+  const loadAnalyses = useCallback(async () => {
+    try {
+      setLoading(true)
+      const resp = await api.get('/api/resume/history')
+      const items = resp?.data?.data || resp?.data || []
+      setAnalyses(items)
+      setSelected(items[0] || null)
+    } catch (e) {
+      console.error(e)
+      toast.error('Unable to load resume analytics. Please refresh the page.')
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [])
+  }, [toast])
+
+  useEffect(() => {
+    loadAnalyses()
+  }, [loadAnalyses])
 
   async function captureElement(el, scale = 2) {
     // ensure animations complete

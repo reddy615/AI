@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import LoadingOverlay from '../components/LoadingOverlay'
@@ -12,7 +12,7 @@ export default function AIQuestionGenerator() {
   const [saving, setSaving] = useState(false)
   const toast = useToast()
 
-  const loadRecent = async () => {
+  const loadRecent = useCallback(async () => {
     try {
       const response = await api.get('/api/ai/questions?limit=20')
       setRecentQuestions(response.data.data?.questions || response.data.questions || [])
@@ -20,11 +20,11 @@ export default function AIQuestionGenerator() {
       console.error(error)
       toast.error('Unable to load recent questions.')
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadRecent()
-  }, [])
+  }, [loadRecent])
 
   const handleChange = (event) => {
     const { name, value } = event.target

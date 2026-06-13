@@ -4,6 +4,7 @@ export default function AnimatedCounter({ value = 0, duration = 800 }) {
   const [n, setN] = useState(0)
   useEffect(() => {
     let start = null
+    let animationFrameId = null
     const from = 0
     const to = Number(value) || 0
     function step(timestamp) {
@@ -11,9 +12,10 @@ export default function AnimatedCounter({ value = 0, duration = 800 }) {
       const progress = Math.min(1, (timestamp - start) / duration)
       const cur = Math.round(from + (to - from) * progress)
       setN(cur)
-      if (progress < 1) requestAnimationFrame(step)
+      if (progress < 1) animationFrameId = requestAnimationFrame(step)
     }
-    requestAnimationFrame(step)
+    animationFrameId = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(animationFrameId)
   }, [value, duration])
   return <span>{n}</span>
 }

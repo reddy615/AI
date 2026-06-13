@@ -69,6 +69,35 @@ export default function MockInterview() {
   const modelsReadyRef = useRef(false)
   const interviewStartedAtRef = useRef(null)
 
+  const speakQuestion = useCallback((questionText) => {
+    if (!questionText || !window.speechSynthesis) return
+    const utterance = new SpeechSynthesisUtterance(questionText)
+    utterance.rate = 0.95
+    utterance.pitch = 1.0
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+  }, [])
+
+  const stopSpeechRecognition = useCallback(() => {
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop()
+      } catch (error) {
+        console.warn(error)
+      }
+      speechRecognitionRef.current = null
+    }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    setIsRecording(false)
+    setAudioStatus('Processing answer...')
+    stopSpeechRecognition()
+  }, [stopSpeechRecognition])
+
   const resetTranscriptState = useCallback(() => {
     setTranscript('')
     setLiveTranscript('')
@@ -167,7 +196,7 @@ export default function MockInterview() {
     })
 
     socketRef.current = socket
-  }, [])
+  }, [speakQuestion, stopRecording])
 
   const loadFaceModels = useCallback(async () => {
     setLoadingModels(true)
@@ -185,7 +214,7 @@ export default function MockInterview() {
     } finally {
       setLoadingModels(false)
     }
-  }, [])
+  }, [toast])
 
   const initCamera = useCallback(async () => {
     console.log('[mock-interview:camera] requesting getUserMedia', {
@@ -278,17 +307,6 @@ export default function MockInterview() {
     return recognition
   }, [])
 
-  const stopSpeechRecognition = useCallback(() => {
-    if (speechRecognitionRef.current) {
-      try {
-        speechRecognitionRef.current.stop()
-      } catch (error) {
-        console.warn(error)
-      }
-      speechRecognitionRef.current = null
-    }
-  }, [])
-
   const startRecording = useCallback(async () => {
     if (!session?._id) return
     if (!cameraStreamRef.current) {
@@ -350,15 +368,6 @@ export default function MockInterview() {
     setAudioStatus('Recording answer...')
     startSpeechRecognition()
   }, [cameraMetrics, currentQuestion?.id, elapsedSeconds, initCamera, liveTranscript, session, startSpeechRecognition, transcript])
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-    }
-    setIsRecording(false)
-    setAudioStatus('Processing answer...')
-    stopSpeechRecognition()
-  }, [stopSpeechRecognition])
 
   const sendTranscript = useCallback(async () => {
     if (!session?._id) return
@@ -497,7 +506,7 @@ export default function MockInterview() {
     if (currentQuestion?.question) {
       speakQuestion(currentQuestion.question)
     }
-  }, [currentQuestion?.question])
+  }, [currentQuestion?.question, speakQuestion])
 
   useEffect(() => {
     console.log('[mock-interview:state] session changed', {
@@ -523,15 +532,6 @@ export default function MockInterview() {
       stopCamera()
     }
   }, [stopCamera, stopSpeechRecognition])
-
-  const speakQuestion = useCallback((questionText) => {
-    if (!questionText || !window.speechSynthesis) return
-    const utterance = new SpeechSynthesisUtterance(questionText)
-    utterance.rate = 0.95
-    utterance.pitch = 1.0
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
-  }, [])
 
   const combinedTranscript = useMemo(() => [liveTranscript, transcript, draftTranscript].filter(Boolean).join('\n').trim(), [draftTranscript, liveTranscript, transcript])
 

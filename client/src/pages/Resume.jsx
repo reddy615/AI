@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api/api'
@@ -122,7 +122,7 @@ export default function Resume() {
   const isDownloadingResume = resumeDeliveryAction === 'download'
   const isResumeDelivering = Boolean(resumeDeliveryAction)
 
-  async function loadProfile({ silent = false } = {}) {
+  const loadProfile = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
     try {
       const resp = await api.get('/api/profile')
@@ -138,12 +138,11 @@ export default function Resume() {
     } finally {
       if (!silent) setLoading(false)
     }
-  }
+  }, [dispatch, toast])
 
   useEffect(() => {
     loadProfile()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [loadProfile])
 
   useEffect(() => {
     return () => {

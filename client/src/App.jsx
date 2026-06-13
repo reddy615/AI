@@ -68,7 +68,7 @@ export default function App() {
       setLoading(false)
     }
     loadUser()
-  }, [])
+  }, [dispatch, token])
 
   const handleLogout = () => {
     dispatch(clearAuth())

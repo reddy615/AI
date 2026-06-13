@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import api from '../api/api'
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const dispatch = useDispatch()
   const toast = useToast()
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true)
     try {
       const [profileResponse, analyticsResponse, recommendationsResponse, gamificationResponse] = await Promise.all([
@@ -48,32 +48,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadDashboard()
-
-    const handleDashboardRefresh = (event) => {
-      if (!event?.detail || event.detail.type !== 'quiz-submitted') return
-      loadDashboard()
-    }
-
-    const handleStorageRefresh = (event) => {
-      if (event.key === 'ai-dashboard-refresh') {
-        loadDashboard()
-      }
-    }
-
-    window.addEventListener('ai-dashboard-refresh', handleDashboardRefresh)
-    window.addEventListener('storage', handleStorageRefresh)
-
-    const intervalId = setInterval(loadDashboard, 30000)
-    return () => {
-      clearInterval(intervalId)
-      window.removeEventListener('ai-dashboard-refresh', handleDashboardRefresh)
-      window.removeEventListener('storage', handleStorageRefresh)
-    }
-  }, [])
+  }, [loadDashboard])
 
   const logout = async () => {
     try {
@@ -106,7 +85,7 @@ export default function Dashboard() {
       <LoadingOverlay
         visible={loading}
         title="Loading dashboard"
-        subtitle="Refreshing your performance summary and recommendations."
+        subtitle="Loading your performance summary and recommendations."
       />
       <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-6 py-8 text-white shadow-xl sm:px-8 lg:px-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -118,6 +97,14 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={loadDashboard}
+              disabled={loading}
+              className="rounded-full border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
             <button onClick={() => navigate('/ai')} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow transition hover:bg-slate-100">Generate AI Questions</button>
             <button onClick={() => navigate('/coding')} className="rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">Open Coding Lab</button>
             <button onClick={() => navigate('/analytics')} className="rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">View Analytics</button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Editor, { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import api from '../api/api'
@@ -44,7 +44,7 @@ export default function CodingAssessment() {
   const [editorTimedOut, setEditorTimedOut] = useState(false)
   const [runError, setRunError] = useState('')
 
-  const loadChallenges = async () => {
+  const loadChallenges = useCallback(async () => {
     setLoading(true)
     console.log('[coding] frontend loadChallenges:start')
     try {
@@ -70,11 +70,11 @@ export default function CodingAssessment() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadChallenges()
-  }, [])
+  }, [loadChallenges])
 
   useEffect(() => {
     console.log('[coding] frontend challenges state', {

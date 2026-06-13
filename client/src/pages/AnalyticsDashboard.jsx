@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import StatsCard from '../components/StatsCard'
@@ -13,7 +13,7 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true)
   const toast = useToast()
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [overviewResponse, leaderboardResponse] = await Promise.all([
@@ -28,11 +28,11 @@ export default function AnalyticsDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const moduleData = useMemo(() => {
     if (!analytics?.moduleBreakdown) return []
