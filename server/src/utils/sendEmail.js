@@ -37,8 +37,14 @@ const sendEmail = async ({
       throw new Error('MAIL_FROM missing');
     }
 
+    const rawFrom = String(process.env.MAIL_FROM || '').trim();
+    const match = rawFrom.match(/<([^>]+)>/);
+    const fromAddress = match ? match[1] : rawFrom;
+
+    console.log('Using MAIL_FROM (normalized):', fromAddress);
+
     const response = await resend.emails.send({
-      from: process.env.MAIL_FROM,
+      from: fromAddress,
       to,
       subject,
       html,
