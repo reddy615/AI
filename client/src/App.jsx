@@ -23,6 +23,10 @@ import About from './pages/About'
 import Blog from './pages/Blog'
 import Careers from './pages/Careers'
 import Contact from './pages/Contact'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import Security from './pages/Security'
+import Cookies from './pages/Cookies'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import PageTransition from './components/PageTransition'
 import Footer from './components/Footer'
@@ -98,6 +102,10 @@ export default function App() {
             <Route path="/blog" element={<PageTransition><Blog /></PageTransition>} />
             <Route path="/careers" element={<PageTransition><Careers /></PageTransition>} />
             <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+            <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+            <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
+            <Route path="/security" element={<PageTransition><Security /></PageTransition>} />
+            <Route path="/cookies" element={<PageTransition><Cookies /></PageTransition>} />
             <Route path="/login" element={!token ? <PageTransition><Login /></PageTransition> : <Navigate to="/dashboard" replace />} />
             <Route path="/register" element={!token ? <PageTransition><Register /></PageTransition> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from "react-router-dom";
+import { Link } from 'react-router-dom'
 
 const socialLinks = [
   { label: 'Twitter', href: '#' },
@@ -47,10 +47,10 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-white">Legal</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#" className="hover:text-cyan-400 transition">Privacy</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Terms</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Security</a></li>
-              <li><a href="#" className="hover:text-cyan-400 transition">Cookies</a></li>
+              <li><Link to="/privacy" className="hover:text-cyan-400 transition">Privacy</Link></li>
+              <li><Link to="/terms" className="hover:text-cyan-400 transition">Terms</Link></li>
+              <li><Link to="/security" className="hover:text-cyan-400 transition">Security</Link></li>
+              <li><Link to="/cookies" className="hover:text-cyan-400 transition">Cookies</Link></li>
             </ul>
           </div>
         </div>
