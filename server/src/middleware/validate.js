@@ -3,9 +3,10 @@ const { validationResult } = require('express-validator');
 function validateRequest(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const messages = errors.array().map((error) => error.msg).join('; ');
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: messages || 'Invalid input',
       errors: errors.array(),
     });
   }

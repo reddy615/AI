@@ -58,21 +58,90 @@ function attachAuthPayload(res, user, tokens, message) {
 }
 
 exports.register = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
-  const salt = await bcrypt.genSalt(10);
-  const hash = await bcrypt.hash(password, salt);
+  try {
+    // ===== DEBUG: Log incoming request =====
+    console.log("=============== REGISTER CONTROLLER START ===============");
+    console.log("REGISTER BODY:", req.body);
 
-  if (!isDatabaseReady()) {
-    return sendError(res, 'Database unavailable', 503);
+    const { name, email, password } = req.body;
+
+    if (!isDatabaseReady()) {
+      console.error("DATABASE NOT READY");
+      return sendError(res, 'Database unavailable', 503);
+    }
+
+    // ===== DEBUG: Database ready =====
+    console.log("Database is ready, mongoose state:", mongoose.connection.readyState);
+
+    // ===== DEBUG: Hash password =====
+    console.log("Generating salt and hashing password...");
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+    console.log("Password hashed successfully");
+
+    // ===== DEBUG: Check existing user =====
+    console.log("Checking for existing user with email:", email);
+    const existing = await User.findOne({ email });
+    if (existing) {
+      console.log("User already exists with email:", email);
+      return sendError(res, 'Email already in use', 400);
+    }
+    console.log("No existing user found, proceeding with creation");
+
+    // ===== DEBUG: Create user =====
+    console.log("Creating user...");
+    const user = await User.create({ name, email, password: hash });
+    console.log("User created successfully:", user._id);
+    console.log("User document:", JSON.stringify({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+    }, null, 2));
+
+    // ===== DEBUG: Issue tokens =====
+    console.log("Issuing tokens...");
+    const tokens = issueTokens(user);
+    console.log("Tokens issued successfully");
+
+    // ===== DEBUG: Set refresh cookie =====
+    console.log("Setting refresh cookie...");
+    setRefreshCookie(res, tokens.refreshToken);
+    console.log("Refresh cookie set");
+
+    // ===== DEBUG: Serialize user profile =====
+    console.log("Creating user profile...");
+    const result = attachAuthPayload(res, user, tokens, 'Registered successfully');
+    console.log("Profile created successfully");
+    console.log("=============== REGISTER CONTROLLER SUCCESS ===============");
+    return result;
+
+  } catch (error) {
+    // ===== CATCH: Full error logging =====
+    console.error("=============== REGISTER CONTROLLER ERROR ===============");
+    console.error("REGISTER CONTROLLER ERROR:", error);
+    console.error("STACK:", error.stack);
+    console.error("ERROR MESSAGE:", error.message);
+    console.error("ERROR NAME:", error.name);
+    console.error("ERROR CODE:", error.code);
+    console.error("FULL ERROR:", JSON.stringify(error, null, 2));
+    
+    // Log validation errors if they exist
+    if (error.errors) {
+      console.error("VALIDATION ERRORS:", error.errors);
+    }
+
+    // Log the original request body for debugging
+    console.error("REQUEST BODY AT ERROR:", req.body);
+    console.error("=============== END ERROR DETAILS ===============");
+
+    // Return the REAL error instead of generic message
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
-
-  const existing = await User.findOne({ email });
-  if (existing) return sendError(res, 'Email already in use', 400);
-
-  const user = await User.create({ name, email, password: hash });
-  const tokens = issueTokens(user);
-  setRefreshCookie(res, tokens.refreshToken);
-  return attachAuthPayload(res, user, tokens, 'Registered successfully');
 });
 
 exports.login = asyncHandler(async (req, res) => {

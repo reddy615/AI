@@ -3,6 +3,7 @@ import api from '../api/api'
 import { useNavigate, Link } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { setToken, setUser } from '../store/store'
+import { useToast } from '../components/ToastProvider'
 
 export default function Register(){
   const [name,setName]=useState('')
@@ -12,19 +13,44 @@ export default function Register(){
   const [error,setError]=useState(null)
   const navigate = useNavigate()
   const dispatch = useDispatch()
+  const toast = useToast()
 
   const submit = async (e)=>{
     e.preventDefault()
     try{
-      const res = await api.post('/api/auth/register',{name,email,password})
-      const payload = res.data?.data || res.data || {}
-      const token = payload.token || payload.accessToken || res.data?.token || null
-      const user = payload.user || res.data?.user || null
+      const response = await api.post('/api/auth/register',{name,email,password})
+      console.log('REGISTER RESPONSE:', response.data)
+
+      const responseSuccess = response.data?.success === true
+      const backendMessage = response.data?.message || 'Registration failed'
+
+      if (!responseSuccess) {
+        console.error('FRONTEND REGISTER ERROR: backend failure', response.data)
+        console.log('BACKEND ERROR MESSAGE:', backendMessage)
+        toast.error(backendMessage)
+        setError(backendMessage)
+        return
+      }
+
+      const payload = response.data?.data || response.data || {}
+      const token = payload.token || payload.accessToken || response.data?.token || null
+      const user = payload.user || response.data?.user || null
 
       if (token) dispatch(setToken(token))
       if (user) dispatch(setUser(user))
+      setError(null)
+      toast.success('Registration successful')
       navigate('/dashboard')
-    }catch(err){ setError(err.response?.data?.message || 'Error') }
+    } catch (error) {
+      console.error('FRONTEND REGISTER ERROR:', error)
+      const backendMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Registration failed'
+      console.log('BACKEND ERROR MESSAGE:', backendMessage)
+      toast.error(backendMessage)
+      setError(backendMessage)
+    }
   }
 
   return (

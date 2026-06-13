@@ -18,7 +18,7 @@ function errorHandler(err, req, res, next) {
   }
 
   if (err?.name === 'ValidationError') {
-    return sendError(res, 'Validation failed', 400, err.errors);
+    return sendError(res, err.message || 'Validation error', 400, err.errors);
   }
 
   if (err?.name === 'CastError') {
