@@ -150,6 +150,10 @@ export default function AdminDashboard() {
       explanation: '',
     },
   ])
+  const [uploadedPdf, setUploadedPdf] = useState(null)
+  const [pdfParsing, setPdfParsing] = useState(false)
+  const [parsedQuestions, setParsedQuestions] = useState([])
+  const [pdfParseError, setPdfParseError] = useState(null)
   const [assessmentFormSaving, setAssessmentFormSaving] = useState(false)
   const [assessmentUpdating, setAssessmentUpdating] = useState({})
   const [bulkAssessmentUpdating, setBulkAssessmentUpdating] = useState(false)
@@ -1379,6 +1383,70 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Upload Questions PDF</h3>
+                  <p className="text-xs text-slate-500">Upload a PDF to auto-parse multiple choice questions.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="pdf-upload"
+                    type="file"
+                    accept="application/pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0]
+                      setPdfParseError(null)
+                      setParsedQuestions([])
+                      if (!file) return
+                      setUploadedPdf(file)
+                      const form = new FormData()
+                      form.append('file', file)
+                      setPdfParsing(true)
+                      try {
+                        const resp = await api.post('/api/admin/assessments/upload-pdf', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+                        const qs = resp.data.data?.questions || resp.data.questions || []
+                        setParsedQuestions(qs)
+                        if (qs.length) {
+                          // merge parsed questions into drafts for review
+                          const nextDrafts = qs.map((q) => ({
+                            id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+                            text: q.text || '',
+                            options: q.options && q.options.length ? q.options : ['', '', '', ''],
+                            correctAnswer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 0,
+                            topic: q.topic || '',
+                            marks: q.marks || '1',
+                            explanation: q.explanation || '',
+                          }))
+                          setQuestionDrafts((current) => [...current, ...nextDrafts])
+                        } else {
+                          setPdfParseError('No questions were parsed from the PDF. Please verify the file format.')
+                        }
+                      } catch (err) {
+                        const msg = err?.response?.data?.message || err?.message || 'Upload failed'
+                        setPdfParseError(msg)
+                      } finally {
+                        setPdfParsing(false)
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <label htmlFor="pdf-upload" className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-cyan-500 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-400">
+                    {pdfParsing ? 'Parsing...' : 'Upload PDF'}
+                  </label>
+                </div>
+              </div>
+
+              {pdfParseError ? (
+                <div className="mt-3 text-sm text-rose-400">{pdfParseError}</div>
+              ) : null}
+
+              {parsedQuestions.length ? (
+                <div className="mt-4 space-y-2">
+                  <div className="text-xs text-slate-400">Parsed questions added to the builder (you can edit or remove them below).</div>
+                </div>
+              ) : null}
             </div>
           </div>
 

@@ -4,6 +4,8 @@ const auth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const validateRequest = require('../middleware/validate');
 const adminController = require('../controllers/adminController');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const {
   assessmentUserIdValidator,
   updateAssessmentAccessValidator,
@@ -44,6 +46,7 @@ router.get('/interviews', adminController.listInterviews);
 router.get('/reports', adminController.getReports);
 
 router.get('/assessments', adminController.listAssessments);
+router.post('/assessments/upload-pdf', upload.single('file'), adminController.uploadAssessmentPdf);
 router.post('/assessments', createAssessmentValidator, validateRequest, adminController.createAssessment);
 router.patch('/assessments/:id', updateAssessmentValidator, validateRequest, adminController.updateAssessment);
 router.delete('/assessments/:id', assessmentIdValidator, validateRequest, adminController.deleteAssessment);

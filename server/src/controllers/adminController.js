@@ -22,6 +22,101 @@ const {
   mergeAssessmentAccess,
   hasAnyAssessmentAccess,
 } = require('../utils/assessmentAccess');
+const pdfParse = require('pdf-parse');
+/**
+ * Parse plain text from PDF into question objects.
+ * This parser is intentionally conservative and looks for a common
+ * pattern used in exported question PDFs:
+ *
+ * 1. Question text
+ * A. Option A
+ * B. Option B
+ * C. Option C
+ * D. Option D
+ * Answer: A
+ */
+function parseQuestionsFromText(text) {
+  if (!text || !String(text).trim()) return [];
+
+  const normalized = String(text).replace(/\r/g, '\n').replace(/\n{2,}/g, '\n\n').trim();
+
+  // Find question start indices using numbering like '1. '
+  const startRegex = /(^|\n)\s*(\d+)\.\s*/g;
+  const starts = [];
+  let m;
+  while ((m = startRegex.exec(normalized)) !== null) {
+    starts.push(m.index + (m[1] ? m[1].length : 0));
+  }
+
+  if (!starts.length) {
+    // No numbered questions found; try to treat entire text as one block
+    return [];
+  }
+
+  const questions = [];
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const end = i + 1 < starts.length ? starts[i + 1] : normalized.length;
+    let block = normalized.slice(start, end).trim();
+    // remove leading numbering
+    block = block.replace(/^\s*\d+\.\s*/i, '').trim();
+
+    // extract Answer line
+    const answerMatch = block.match(/Answer\s*[:\-]?\s*([A-D0-9])/i);
+    let answerLetter = null;
+    if (answerMatch) {
+      answerLetter = String(answerMatch[1]).trim().toUpperCase();
+      // remove answer line from block
+      block = block.replace(answerMatch[0], '').trim();
+    }
+
+    // extract options: lines starting with A. or A)
+    const optionRegex = /(^|\n)\s*([A-D])\s*[\.)\-:]\s*(.+?)(?=\n|$)/gi;
+    const options = [];
+    let om;
+    while ((om = optionRegex.exec(block)) !== null) {
+      options.push(om[3].trim());
+    }
+
+    // if no options found, try a fallback: lines in ALL CAPS with trailing punctuation
+    if (!options.length) {
+      const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
+      // heuristic: find lines that start with single letter followed by dot or )
+      for (const ln of lines) {
+        const m2 = ln.match(/^([A-D])\s*[\.)\-:]\s*(.+)$/);
+        if (m2) options.push(m2[2].trim());
+      }
+    }
+
+    // Remove option lines from question text
+    if (options.length) {
+      // remove common option prefixes from block
+      block = block.replace(/(^|\n)\s*[A-D]\s*[\.)\-:]\s*.+(?=\n|$)/gi, '').trim();
+    }
+
+    // Final clean: remove stray 'Answer' lines or trailing labels
+    block = block.replace(/(^|\n)\s*Answer\s*[:\-]?.*$/i, '').trim();
+
+    let correctIndex = 0;
+    if (answerLetter && /^[A-D]$/.test(answerLetter) && options.length) {
+      correctIndex = answerLetter.charCodeAt(0) - 65;
+      if (correctIndex < 0 || correctIndex >= options.length) correctIndex = 0;
+    }
+
+    const questionText = block.split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+
+    questions.push({
+      text: questionText || 'Untitled question',
+      options: options.length ? options : [],
+      correctAnswer: correctIndex,
+      topic: '',
+      marks: 1,
+      explanation: '',
+    });
+  }
+
+  return questions;
+}
 
 const emailReminderCooldownMap = new Map();
 const EMAIL_REMINDER_COOLDOWN_MS = 60 * 1000;
@@ -439,6 +534,34 @@ exports.listAssessments = asyncHandler(async (req, res) => {
   );
 
   return res.apiSuccess({ assessments }, 'Assessments loaded');
+});
+
+exports.uploadAssessmentPdf = asyncHandler(async (req, res) => {
+  // Expecting multer to populate req.file
+  const file = req.file;
+  if (!file) {
+    return sendError(res, 'No file uploaded', 400);
+  }
+
+  const filename = String(file.originalname || '').toLowerCase();
+  if (!filename.endsWith('.pdf') && file.mimetype !== 'application/pdf') {
+    return sendError(res, 'Unsupported file format. Please upload a PDF.', 400);
+  }
+
+  try {
+    const data = await pdfParse(file.buffer);
+    const text = data && data.text ? String(data.text || '') : '';
+    const questions = parseQuestionsFromText(text || '');
+
+    if (!questions.length) {
+      return res.apiSuccess({ questions: [] }, 'No questions parsed from PDF');
+    }
+
+    return res.apiSuccess({ questions }, 'PDF parsed successfully');
+  } catch (err) {
+    console.error('PDF parse error', err);
+    return sendError(res, 'Unable to parse PDF file', 500);
+  }
 });
 
 exports.createAssessment = asyncHandler(async (req, res) => {
