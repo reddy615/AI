@@ -8,6 +8,9 @@ const {
   assessmentUserIdValidator,
   updateAssessmentAccessValidator,
   bulkAssessmentAccessValidator,
+  assessmentIdValidator,
+  createAssessmentValidator,
+  updateAssessmentValidator,
 } = require('../validators/adminValidators');
 
 router.use(auth, requireRole('admin'));
@@ -39,5 +42,10 @@ router.get('/users/:id/resume', adminController.getUserResume);
 router.get('/questions', adminController.listQuestions);
 router.get('/interviews', adminController.listInterviews);
 router.get('/reports', adminController.getReports);
+
+router.get('/assessments', adminController.listAssessments);
+router.post('/assessments', createAssessmentValidator, validateRequest, adminController.createAssessment);
+router.patch('/assessments/:id', updateAssessmentValidator, validateRequest, adminController.updateAssessment);
+router.delete('/assessments/:id', assessmentIdValidator, validateRequest, adminController.deleteAssessment);
 
 module.exports = router;

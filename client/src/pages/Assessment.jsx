@@ -22,29 +22,7 @@ const emptyAssessmentAccess = {
   mockInterview: false,
 }
 
-const assessments = [
-  {
-    accessKey: 'technical',
-    title: 'Technical Assessment',
-    description:
-      'Evaluate core computer science concepts, problem-solving skills, and technical fundamentals.',
-    difficulty: 'Advanced',
-    icon: BrainCircuit,
-    href: '/quiz?module=reasoning&count=10&difficulty=hard',
-    accent: 'from-cyan-400 to-blue-500',
-    badge: 'bg-cyan-400/10 text-cyan-300 ring-cyan-400/20',
-  },
-  {
-    accessKey: 'aptitude',
-    title: 'Aptitude Assessment',
-    description:
-      'Practice quantitative aptitude, logical reasoning, and verbal ability in a focused test format.',
-    difficulty: 'Intermediate',
-    icon: Calculator,
-    href: '/quiz?module=aptitude&count=10',
-    accent: 'from-violet-400 to-fuchsia-500',
-    badge: 'bg-violet-400/10 text-violet-300 ring-violet-400/20',
-  },
+const staticAssessments = [
   {
     accessKey: 'mockInterview',
     title: 'Mock Interview Assessment',
@@ -68,6 +46,19 @@ const assessments = [
     badge: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/20',
   },
 ]
+
+const assessmentMeta = {
+  technical: {
+    icon: BrainCircuit,
+    accent: 'from-cyan-400 to-blue-500',
+    badge: 'bg-cyan-400/10 text-cyan-300 ring-cyan-400/20',
+  },
+  aptitude: {
+    icon: Calculator,
+    accent: 'from-violet-400 to-fuchsia-500',
+    badge: 'bg-violet-400/10 text-violet-300 ring-violet-400/20',
+  },
+}
 
 const containerVariants = {
   hidden: {},
@@ -97,6 +88,8 @@ export default function Assessment() {
     isAdmin: user?.role === 'admin',
     loading: true,
   })
+  const [activeAssessments, setActiveAssessments] = useState([])
+  const [assessmentsLoading, setAssessmentsLoading] = useState(true)
 
   useEffect(() => {
     let active = true
@@ -123,12 +116,69 @@ export default function Assessment() {
       }
     }
 
+    const loadActiveAssessments = async () => {
+      try {
+        const response = await api.get('/api/assessments')
+        const payload = response.data?.data || response.data
+        const items = Array.isArray(payload?.assessments) ? payload.assessments : []
+
+        if (active) {
+          setActiveAssessments(items)
+        }
+      } catch {
+        if (active) {
+          setActiveAssessments([])
+        }
+      } finally {
+        if (active) {
+          setAssessmentsLoading(false)
+        }
+      }
+    }
+
     loadAssessmentAccess()
+    loadActiveAssessments()
 
     return () => {
       active = false
     }
   }, [])
+
+  const buildAssessmentCard = (assessment) => {
+    const meta = assessmentMeta[assessment.accessKey] || {
+      icon: Target,
+      accent: 'from-slate-500 to-slate-700',
+      badge: 'bg-slate-500/10 text-slate-300 ring-slate-500/20',
+    }
+
+    const moduleName = assessment.module || 'reasoning'
+    const count = assessment.count || 10
+    const difficulty = assessment.difficulty ? assessment.difficulty.charAt(0).toUpperCase() + assessment.difficulty.slice(1) : 'Intermediate'
+    let href = `/quiz?module=${encodeURIComponent(moduleName)}&count=${encodeURIComponent(count)}${assessment.difficulty ? `&difficulty=${encodeURIComponent(assessment.difficulty)}` : ''}`
+
+    if (assessment.accessKey === 'mockInterview') {
+      href = '/interview'
+    } else if (assessment.accessKey === 'coding') {
+      href = '/coding'
+    }
+
+    return {
+      id: assessment._id,
+      accessKey: assessment.accessKey,
+      title: assessment.title,
+      description: assessment.description || 'Practice this assessment to sharpen your skills.',
+      difficulty,
+      icon: meta.icon,
+      href,
+      accent: meta.accent,
+      badge: meta.badge,
+    }
+  }
+
+  const renderedAssessments = [
+    ...activeAssessments.map(buildAssessmentCard),
+    ...staticAssessments,
+  ]
 
   return (
     <section className="relative min-h-[calc(100vh-5rem)] overflow-hidden bg-slate-950 px-4 pb-20 pt-12 text-white sm:px-6 sm:pt-16 lg:px-8">
@@ -165,7 +215,7 @@ export default function Assessment() {
           className="grid gap-5 md:grid-cols-2"
           aria-label="Available assessments"
         >
-          {assessments.map((assessment) => {
+          {renderedAssessments.map((assessment) => {
             const Icon = assessment.icon
             const hasAccess = accessState.isAdmin || accessState.permissions[assessment.accessKey]
 

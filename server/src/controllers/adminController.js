@@ -7,6 +7,7 @@ const AIQuestion = require('../models/AIQuestion');
 const Attempt = require('../models/Attempt');
 const CodingAttempt = require('../models/CodingAttempt');
 const MockInterviewSession = require('../models/MockInterviewSession');
+const Assessment = require('../models/Assessment');
 const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
 const { sendEmail } = require('../utils/sendEmail');
@@ -428,6 +429,87 @@ exports.listInterviews = asyncHandler(async (req, res) => {
   );
 
   return res.apiSuccess({ sessions }, 'Interview sessions loaded');
+});
+
+exports.listAssessments = asyncHandler(async (req, res) => {
+  const assessments = await runAdminQuery(
+    'assessments.list',
+    () => Assessment.find().sort({ order: 1, createdAt: -1 }).lean(),
+    []
+  );
+
+  return res.apiSuccess({ assessments }, 'Assessments loaded');
+});
+
+exports.createAssessment = asyncHandler(async (req, res) => {
+  const {
+    title,
+    description,
+    accessKey,
+    module,
+    category,
+    difficulty,
+    count,
+    active,
+    order,
+  } = req.body;
+
+  const assessment = await Assessment.create({
+    title,
+    description: description || '',
+    accessKey,
+    module: module || null,
+    category: category || '',
+    difficulty: difficulty || 'medium',
+    count: typeof count === 'number' ? count : 10,
+    active: typeof active === 'boolean' ? active : true,
+    order: typeof order === 'number' ? order : 0,
+    createdBy: req.user && req.user._id ? req.user._id : null,
+  });
+
+  return res.apiSuccess({ assessment }, 'Assessment created');
+});
+
+exports.updateAssessment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const assessment = await Assessment.findById(id);
+  if (!assessment) {
+    return sendError(res, 'Assessment not found', 404);
+  }
+
+  const updateFields = [
+    'title',
+    'description',
+    'accessKey',
+    'module',
+    'category',
+    'difficulty',
+    'count',
+    'active',
+    'order',
+  ];
+
+  updateFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      assessment[field] = req.body[field];
+    }
+  });
+
+  await assessment.save();
+
+  return res.apiSuccess({ assessment }, 'Assessment updated');
+});
+
+exports.deleteAssessment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const assessment = await Assessment.findById(id);
+  if (!assessment) {
+    return sendError(res, 'Assessment not found', 404);
+  }
+
+  await assessment.deleteOne();
+
+  return res.apiSuccess({ id }, 'Assessment deleted');
 });
 
 exports.getReports = asyncHandler(async (req, res) => {

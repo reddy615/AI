@@ -22,6 +22,7 @@ const mockInterviewRoutes = require('./routes/mockInterviews');
 const recommendationRoutes = require('./routes/recommendations');
 const gamificationRoutes = require('./routes/gamification');
 const adminRoutes = require('./routes/admin');
+const assessmentRoutes = require('./routes/assessments');
 const resumeRoutes = require('./routes/resume');
 
 client.collectDefaultMetrics({ prefix: 'ai_interview_' });
@@ -157,6 +158,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/assessments', assessmentRoutes);
 app.use('/api/mock-interviews', mockInterviewRoutes);
 app.use('/api/resume', resumeRoutes);
 
