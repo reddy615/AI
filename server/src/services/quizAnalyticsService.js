@@ -13,14 +13,14 @@ function normalizeLabel(value) {
 
 function isFallbackTopic(value) {
   const topic = normalizeLabel(value);
-  return !topic || topic.toLowerCase() === 'general';
+  return !topic || topic.toLowerCase() === 'general' || topic.toLowerCase() === 'unknown topic'; // Include 'unknown topic' as a fallback
 }
 
 function getQuestionId(answer) {
   const questionId = answer?.questionId?._id || answer?.questionId;
   return questionId ? String(questionId) : null;
 }
-
+// Determines the most appropriate topic label for an answer, falling back to 'Unknown Topic' if none is found.
 function resolveTopic(answer, attempt = {}) {
   const storedTopic = normalizeLabel(answer?.topic);
   return (!isFallbackTopic(storedTopic) ? storedTopic : null)
@@ -28,8 +28,8 @@ function resolveTopic(answer, attempt = {}) {
     || normalizeLabel(answer?.category)
     || normalizeLabel(answer?.questionId?.category)
     || normalizeLabel(attempt.category)
-    || storedTopic
-    || 'General';
+    || storedTopic // This will be null if it was a fallback topic
+    || 'Unknown Topic'; // Final fallback if no specific topic is identified
 }
 
 function isSkippedAnswer(answer) {

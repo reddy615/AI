@@ -1,6 +1,6 @@
 import { Activity, ArrowUpRight, Award, BarChart3, BadgeCheck, BrainCircuit, Calculator, Clock3, Flame, Lightbulb, Percent, PieChart, Radar, Scale, Sparkles, Sigma, Target, TrendingUp, Trophy, Code2 } from 'lucide-react'
 
-export const topicIconMap = {
+export const topicIconMap = { // Maps topic names to Lucide icons for display
   Coding: Code2,
   Aptitude: Calculator,
   'Verbal Ability': Lightbulb,
@@ -45,6 +45,7 @@ export const topicIconMap = {
   Conjunctions: Sparkles,
   'Paragraph Rearrangement': BarChart3,
   Spelling: Award,
+  'Coding Questions': Code2, // Added for consistency with backend parsing
 }
 
 export function formatDuration(seconds) {

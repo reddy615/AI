@@ -39,7 +39,7 @@ function parseQuestionsFromText(text) {
   if (!text || !String(text).trim()) return [];
 
   const lines = text.split('\n').map((line) => line.trim());
-  const questions = [];
+  const questions = []; // Stores the final parsed question objects
   let currentSection = 'General';
   let currentQuestion = null;
   let parsingState = 'none'; // 'none', 'question_text', 'options', 'explanation'
@@ -73,6 +73,7 @@ function parseQuestionsFromText(text) {
   const commitCurrentQuestion = () => {
     if (!currentQuestion) return;
 
+    // Determine if the question is a coding question based on topic or text content
     const isCodingSection = currentQuestion.topic === 'Coding Questions' || currentQuestion.topic === 'Coding';
     const hasNoOptions = currentQuestion.options.length === 0;
     const isCodingText = /write\s+(?:a\s+)?(?:program|function|code|algorithm|script|method)/i.test(currentQuestion.text);
@@ -93,6 +94,16 @@ function parseQuestionsFromText(text) {
       }
     }
 
+    // Ensure topic and category are never 'General' or empty if they should be 'Unknown Topic'
+    // This prevents "General" from appearing in the UI for unclassified questions.
+    if (!currentQuestion.topic || currentQuestion.topic === 'General') {
+      currentQuestion.topic = 'Unknown Topic';
+    }
+    if (!currentQuestion.category || currentQuestion.category === 'General') {
+      currentQuestion.category = 'Unknown Topic';
+    }
+
+    // Trim and assign final question properties
     currentQuestion.text = currentQuestion.text.trim();
     currentQuestion.question = currentQuestion.text;
     currentQuestion.explanation = currentQuestion.explanation.trim();
@@ -103,17 +114,20 @@ function parseQuestionsFromText(text) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) continue;
+    if (!line) continue; // Skip empty lines
 
     // Skip page numbers and headers
     if (/^\s*Page\s*\d+\s*(?:of\s*\d+)?\s*$/i.test(line)) {
       continue;
     }
 
-    // 1. Check for Section Heading
+    // 1. Check for Section Heading (e.g., "Verbal Ability", "Aptitude")
     let sectionMatched = false;
     for (const sec of sectionRegexes) {
+      // Check if the line matches a section regex and is reasonably short (to avoid matching within question text)
       if (sec.regex.test(line) && line.length < 40) {
+        // Commit any ongoing question before starting a new section
+        // This ensures the previous question gets the correct section assigned.
         commitCurrentQuestion();
         currentSection = sec.name;
         console.log("CURRENT SECTION:", currentSection);
@@ -125,17 +139,19 @@ function parseQuestionsFromText(text) {
     if (sectionMatched) continue;
 
     // 2. Check for Question Start
-    const qMatch = line.match(questionStartRegex);
+    const qMatch = line.match(questionStartRegex); // Attempt to match question numbering pattern
     if (qMatch) {
       const qNum = parseInt(qMatch[1], 10);
       if (qNum > 0 && qNum <= 150) {
+        // Commit any ongoing question before starting a new one
         commitCurrentQuestion();
         currentQuestion = {
           text: qMatch[2],
           options: [],
           correctAnswer: 0,
-          topic: currentSection,
-          category: currentSection,
+          // Assign the current detected section as topic and category
+          topic: currentSection, 
+          category: currentSection, 
           difficulty: 'Medium',
           marks: 1,
           explanation: '',
@@ -145,7 +161,7 @@ function parseQuestionsFromText(text) {
       }
     }
 
-    // 3. Check for Options (single or inline)
+    // 3. Check for Options (e.g., "A. Option A", "B. Option B")
     const optionsFound = extractOptionsFromLine(line);
     if (optionsFound.length > 0 && currentQuestion) {
       optionsFound.forEach((opt) => {
@@ -155,7 +171,7 @@ function parseQuestionsFromText(text) {
       continue;
     }
 
-    // 4. Check for Answer
+    // 4. Check for Answer (e.g., "Answer: A")
     const ansMatch = line.match(answerRegex);
     if (ansMatch && currentQuestion) {
       const ansLetter = ansMatch[1].toUpperCase();
@@ -165,7 +181,7 @@ function parseQuestionsFromText(text) {
       continue;
     }
 
-    // 5. Check for Explanation
+    // 5. Check for Explanation (e.g., "Explanation: ...")
     const expMatch = line.match(explanationRegex);
     if (expMatch && currentQuestion) {
       currentQuestion.explanation = expMatch[1];
@@ -173,7 +189,7 @@ function parseQuestionsFromText(text) {
       continue;
     }
 
-    // 6. Append to current state
+    // 6. If no specific pattern matched, append the line to the current parsing state
     if (currentQuestion) {
       if (parsingState === 'question_text') {
         currentQuestion.text += '\n' + line;

@@ -1681,7 +1681,7 @@ export default function AdminDashboard() {
                         <th className="px-5 py-4 font-semibold">Title</th>
                         <th className="px-5 py-4 font-semibold">Type</th>
                         <th className="px-5 py-4 font-semibold">Difficulty</th>
-                        <th className="px-5 py-4 font-semibold">Count</th>
+                          <th className="px-5 py-4 font-semibold">Questions</th>
                         <th className="px-5 py-4 font-semibold">Status</th>
                         <th className="px-5 py-4 font-semibold">Actions</th>
                       </tr>
