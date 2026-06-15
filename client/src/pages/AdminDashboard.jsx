@@ -9,6 +9,10 @@ import {
   Search,
   ShieldCheck,
   Users,
+  Plus,
+  X,
+  Trash2,
+  Edit3,
 } from 'lucide-react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
@@ -120,6 +124,33 @@ export default function AdminDashboard() {
   const [assessmentSummary, setAssessmentSummary] = useState(null)
   const [assessmentSearch, setAssessmentSearch] = useState('')
   const [assessmentLoading, setAssessmentLoading] = useState(false)
+  const [assessmentList, setAssessmentList] = useState([])
+  const [assessmentListLoading, setAssessmentListLoading] = useState(false)
+  const [isAssessmentModalOpen, setAssessmentModalOpen] = useState(false)
+  const [editingAssessment, setEditingAssessment] = useState(null)
+  const [assessmentForm, setAssessmentForm] = useState({
+    title: '',
+    type: 'technical',
+    difficulty: 'medium',
+    duration: '30',
+    count: '10',
+    passingScore: '60',
+    description: '',
+    topics: '',
+    status: true,
+  })
+  const [questionDrafts, setQuestionDrafts] = useState([
+    {
+      id: String(Date.now()),
+      text: '',
+      options: ['', '', '', ''],
+      correctAnswer: 0,
+      topic: '',
+      marks: '1',
+      explanation: '',
+    },
+  ])
+  const [assessmentFormSaving, setAssessmentFormSaving] = useState(false)
   const [assessmentUpdating, setAssessmentUpdating] = useState({})
   const [bulkAssessmentUpdating, setBulkAssessmentUpdating] = useState(false)
   const assessmentRequestId = useRef(0)
@@ -222,12 +253,189 @@ export default function AdminDashboard() {
     }
   }, [toast])
 
+  const loadAssessmentList = useCallback(async () => {
+    setAssessmentListLoading(true)
+    try {
+      const response = await api.get('/api/admin/assessments')
+      const payload = response.data?.data || response.data
+      setAssessmentList(Array.isArray(payload?.assessments) ? payload.assessments : [])
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to load assessments'
+      toast.error(message)
+    } finally {
+      setAssessmentListLoading(false)
+    }
+  }, [toast])
+
+  const resetAssessmentForm = () => {
+    setEditingAssessment(null)
+    setAssessmentForm({
+      title: '',
+      type: 'technical',
+      difficulty: 'medium',
+      duration: '30',
+      count: '10',
+      passingScore: '60',
+      description: '',
+      topics: '',
+      status: true,
+    })
+    setQuestionDrafts([
+      {
+        id: String(Date.now()),
+        text: '',
+        options: ['', '', '', ''],
+        correctAnswer: 0,
+        topic: '',
+        marks: '1',
+        explanation: '',
+      },
+    ])
+  }
+
+  const createQuestionDraft = () => ({
+    id: String(Date.now()) + Math.random(),
+    text: '',
+    options: ['', '', '', ''],
+    correctAnswer: 0,
+    topic: '',
+    marks: '1',
+    explanation: '',
+  })
+
+  const openCreateAssessmentModal = () => {
+    resetAssessmentForm()
+    setAssessmentModalOpen(true)
+  }
+
+  const openEditAssessmentModal = (assessment) => {
+    setEditingAssessment(assessment)
+    setAssessmentForm({
+      title: assessment.title || '',
+      type: assessment.accessKey || 'technical',
+      difficulty: assessment.difficulty || 'medium',
+      duration: String(assessment.duration || 30),
+      count: String(assessment.count || 10),
+      passingScore: String(assessment.passingScore || 60),
+      description: assessment.description || '',
+      topics: Array.isArray(assessment.topics) ? assessment.topics.join(', ') : '',
+      status: assessment.active !== false,
+    })
+    setQuestionDrafts(
+      Array.isArray(assessment.questions) && assessment.questions.length
+        ? assessment.questions.map((question) => ({
+          id: question._id || String(Date.now()) + Math.random(),
+          text: question.text || '',
+          options: Array.isArray(question.options) ? question.options.slice(0, 4).concat(['', '', '', '']).slice(0, 4) : ['', '', '', ''],
+          correctAnswer: typeof question.correctAnswer === 'number' ? question.correctAnswer : 0,
+          topic: question.topic || '',
+          marks: String(question.marks || 1),
+          explanation: question.explanation || '',
+        }))
+        : [createQuestionDraft()]
+    )
+    setAssessmentModalOpen(true)
+  }
+
+  const updateQuestionDraft = (index, field, value) => {
+    setQuestionDrafts((current) => current.map((question, idx) => {
+      if (idx !== index) return question
+      if (field === 'options') {
+        return { ...question, options: value }
+      }
+      return { ...question, [field]: value }
+    }))
+  }
+
+  const addQuestionDraft = () => {
+    setQuestionDrafts((current) => [...current, createQuestionDraft()])
+  }
+
+  const removeQuestionDraft = (index) => {
+    setQuestionDrafts((current) => current.filter((_, idx) => idx !== index))
+  }
+
+  const saveAssessment = async () => {
+    setAssessmentFormSaving(true)
+    try {
+      const payload = {
+        title: assessmentForm.title,
+        description: assessmentForm.description,
+        accessKey: assessmentForm.type,
+        module: assessmentForm.type === 'technical' ? 'reasoning' : assessmentForm.type === 'aptitude' ? 'aptitude' : null,
+        category: assessmentForm.type,
+        difficulty: assessmentForm.difficulty,
+        count: Number(assessmentForm.count) || 10,
+        duration: Number(assessmentForm.duration) || 30,
+        passingScore: Number(assessmentForm.passingScore) || 60,
+        topics: assessmentForm.topics
+          .split(',')
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+        active: assessmentForm.status === true,
+        questions: questionDrafts.map((question) => ({
+          text: question.text,
+          options: question.options.map((option) => option || ''),
+          correctAnswer: Number(question.correctAnswer) || 0,
+          topic: question.topic,
+          marks: Number(question.marks) || 1,
+          explanation: question.explanation,
+        })),
+      }
+
+      if (editingAssessment) {
+        await api.patch(`/api/admin/assessments/${editingAssessment._id}`, payload)
+        toast.success('Assessment updated successfully')
+      } else {
+        await api.post('/api/admin/assessments', payload)
+        toast.success('Assessment created successfully')
+      }
+
+      setAssessmentModalOpen(false)
+      resetAssessmentForm()
+      loadAssessmentList()
+      loadAssessmentSummary()
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to save assessment'
+      toast.error(message)
+    } finally {
+      setAssessmentFormSaving(false)
+    }
+  }
+
+  const handleDeleteAssessment = async (assessment) => {
+    if (!window.confirm(`Delete assessment "${assessment.title}"? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/api/admin/assessments/${assessment._id}`)
+      toast.success('Assessment deleted')
+      await loadAssessmentList()
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to delete assessment'
+      toast.error(message)
+    }
+  }
+
+  const handleToggleAssessmentActive = async (assessment) => {
+    try {
+      await api.patch(`/api/admin/assessments/${assessment._id}`, { active: !assessment.active })
+      toast.success(`Assessment ${assessment.active ? 'deactivated' : 'activated'}`)
+      await loadAssessmentList()
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to update assessment status'
+      toast.error(message)
+    }
+  }
+
   useEffect(() => {
     if (activeTab !== 'assessments') return undefined
 
     loadAssessmentSummary()
+    loadAssessmentList()
     return undefined
-  }, [activeTab, loadAssessmentSummary])
+  }, [activeTab, loadAssessmentSummary, loadAssessmentList])
 
   useEffect(() => {
     if (activeTab !== 'assessments') return undefined
@@ -930,6 +1138,272 @@ export default function AdminDashboard() {
     )
   }
 
+  const renderAssessmentModal = () => {
+    if (!isAssessmentModalOpen) return null
+
+    return (
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 text-white shadow-2xl shadow-black/40">
+          <div className="flex items-start justify-between border-b border-slate-800 p-6 sm:p-7">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
+                {editingAssessment ? 'Edit assessment' : 'New assessment'}
+              </p>
+              <h2 className="mt-2 text-2xl font-bold">{editingAssessment ? 'Update Assessment' : 'Create New Assessment'}</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Configure assessment details and optional question templates for this assignment.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAssessmentModalOpen(false)}
+              className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              aria-label="Close assessment form"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-6 p-6 sm:p-7">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Title</span>
+                <input
+                  type="text"
+                  value={assessmentForm.title}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Assessment title"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Type</span>
+                <select
+                  value={assessmentForm.type}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, type: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                >
+                  {assessmentOptions.map((option) => (
+                    <option key={option.key} value={option.key}>{option.title}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Difficulty</span>
+                <select
+                  value={assessmentForm.difficulty}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, difficulty: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Status</span>
+                <select
+                  value={assessmentForm.status ? 'active' : 'inactive'}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, status: event.target.value === 'active' }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Duration (min)</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={assessmentForm.duration}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, duration: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Questions</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={assessmentForm.count}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, count: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Passing Score (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={assessmentForm.passingScore}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, passingScore: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-200">Description</span>
+              <textarea
+                value={assessmentForm.description}
+                onChange={(event) => setAssessmentForm((current) => ({ ...current, description: event.target.value }))}
+                rows="3"
+                className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                placeholder="Short description for admins and candidates"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-200">Topics</span>
+              <input
+                type="text"
+                value={assessmentForm.topics}
+                onChange={(event) => setAssessmentForm((current) => ({ ...current, topics: event.target.value }))}
+                placeholder="Comma-separated topics"
+                className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              />
+            </label>
+
+            <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Question Builder</h3>
+                  <p className="text-xs text-slate-500">Optional question placeholders for this assessment.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addQuestionDraft}
+                  className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-400"
+                >
+                  <Plus className="h-4 w-4" /> Add Question
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {questionDrafts.map((question, index) => (
+                  <div key={question.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white">Question {index + 1}</div>
+                        <div className="text-xs text-slate-500">Optional template content only.</div>
+                      </div>
+                      {questionDrafts.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestionDraft(index)}
+                          className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="mt-4 grid gap-4">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-slate-400">Question text</span>
+                        <textarea
+                          rows="2"
+                          value={question.text}
+                          onChange={(event) => updateQuestionDraft(index, 'text', event.target.value)}
+                          className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                          placeholder="Write the question prompt"
+                        />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {question.options.map((option, optionIndex) => (
+                          <label key={optionIndex} className="block">
+                            <span className="text-xs font-semibold text-slate-400">Option {optionIndex + 1}</span>
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(event) => {
+                                const nextOptions = [...question.options]
+                                nextOptions[optionIndex] = event.target.value
+                                updateQuestionDraft(index, 'options', nextOptions)
+                              }}
+                              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                              placeholder={`Option ${optionIndex + 1}`}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-400">Correct answer</span>
+                          <select
+                            value={question.correctAnswer}
+                            onChange={(event) => updateQuestionDraft(index, 'correctAnswer', Number(event.target.value))}
+                            className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                          >
+                            {question.options.map((_, optionIndex) => (
+                              <option key={optionIndex} value={optionIndex}>Option {optionIndex + 1}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-400">Marks</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={question.marks}
+                            onChange={(event) => updateQuestionDraft(index, 'marks', event.target.value)}
+                            className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-400">Topic</span>
+                          <input
+                            type="text"
+                            value={question.topic}
+                            onChange={(event) => updateQuestionDraft(index, 'topic', event.target.value)}
+                            className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                            placeholder="Optional topic"
+                          />
+                        </label>
+                      </div>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-slate-400">Explanation</span>
+                        <textarea
+                          rows="2"
+                          value={question.explanation}
+                          onChange={(event) => updateQuestionDraft(index, 'explanation', event.target.value)}
+                          className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                          placeholder="Optional explanation"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-slate-800 px-6 py-5 sm:flex-row sm:justify-end sm:px-7">
+            <button
+              type="button"
+              onClick={() => setAssessmentModalOpen(false)}
+              className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveAssessment}
+              disabled={assessmentFormSaving}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-950/30 transition hover:from-cyan-400 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {assessmentFormSaving ? 'Saving...' : editingAssessment ? 'Save Changes' : 'Create Assessment'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderAssessments = () => {
     const summary = assessmentSummary || buildLocalAssessmentSummary(assessmentUsers)
     const totalPages = Math.max(1, Math.ceil(assessmentTotal / assessmentPageSize))
@@ -1028,6 +1502,101 @@ export default function AdminDashboard() {
                   </motion.article>
                 )
               })}
+            </div>
+          </section>
+
+          <section aria-labelledby="assessment-management-list-title" className="rounded-2xl border border-white/10 bg-slate-900/70">
+            <div className="border-b border-white/10 p-4 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Section B</p>
+                  <h3 id="assessment-management-list-title" className="mt-2 text-xl font-bold">Assessment Catalog</h3>
+                  <p className="mt-1 text-sm text-slate-500">Create, activate, and manage the assessments available to candidates.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openCreateAssessmentModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-950/40 hover:from-cyan-400 hover:to-blue-500"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Assessment
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {assessmentListLoading ? (
+                <div className="flex min-h-[14rem] items-center justify-center text-slate-400">
+                  <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" />
+                  <span className="ml-3">Loading assessments...</span>
+                </div>
+              ) : assessmentList.length ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="border-b border-white/10 bg-slate-950/60 text-left text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                      <tr>
+                        <th className="px-5 py-4 font-semibold">Title</th>
+                        <th className="px-5 py-4 font-semibold">Type</th>
+                        <th className="px-5 py-4 font-semibold">Difficulty</th>
+                        <th className="px-5 py-4 font-semibold">Count</th>
+                        <th className="px-5 py-4 font-semibold">Status</th>
+                        <th className="px-5 py-4 font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {assessmentList.map((assessment) => (
+                        <tr key={assessment._id || assessment.id} className="hover:bg-white/[0.025]">
+                          <td className="px-5 py-4 font-semibold text-slate-100">
+                            {assessment.title || 'Untitled'}
+                          </td>
+                          <td className="px-5 py-4 text-slate-400">
+                            {assessmentOptions.find((option) => option.key === assessment.accessKey)?.shortTitle || assessment.accessKey || assessment.category || '—'}
+                          </td>
+                          <td className="px-5 py-4 text-slate-400 capitalize">{assessment.difficulty || 'medium'}</td>
+                          <td className="px-5 py-4 text-slate-400">{assessment.count ?? '—'}</td>
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${assessment.active ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-500/10 text-rose-300'}`}>
+                              {assessment.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditAssessmentModal(assessment)}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAssessmentActive(assessment)}
+                                className="inline-flex items-center rounded-full border border-slate-700 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10"
+                              >
+                                {assessment.active ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAssessment(assessment)}
+                                className="inline-flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/20"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-700 bg-slate-950/90 p-10 text-center text-slate-400">
+                  <div className="mb-4 text-2xl">No assessments yet</div>
+                  <div className="text-sm">Use the button above to create your first assessment.</div>
+                </div>
+              )}
             </div>
           </section>
 
@@ -1390,6 +1959,7 @@ export default function AdminDashboard() {
           {activeTab === 'questions' && renderQuestions()}
           {activeTab === 'interviews' && renderInterviews()}
           {activeTab === 'reports' && renderReports()}
+          {renderAssessmentModal()}
         </main>
       </div>
     </div>

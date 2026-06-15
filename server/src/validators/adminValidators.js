@@ -28,6 +28,15 @@ const createAssessmentValidator = [
     .isIn(['easy', 'medium', 'hard'])
     .withMessage('Invalid difficulty'),
   body('count').optional().isInt({ min: 1, max: 100 }).withMessage('Count must be between 1 and 100'),
+  body('duration').optional().isInt({ min: 1 }).withMessage('Duration must be a positive number'),
+  body('passingScore').optional().isInt({ min: 0, max: 100 }).withMessage('Passing score must be between 0 and 100'),
+  body('topics').optional().isArray().withMessage('Topics must be an array'),
+  body('topics.*').optional().isString().withMessage('Topic must be a string'),
+  body('questions').optional().isArray().withMessage('Questions must be an array'),
+  body('questions.*.text').optional().isString(),
+  body('questions.*.options').optional().isArray().withMessage('Question options must be an array'),
+  body('questions.*.correctAnswer').optional().isInt({ min: 0 }).withMessage('Correct answer must be a non-negative integer'),
+  body('questions.*.marks').optional().isInt({ min: 1 }).withMessage('Question marks must be a positive integer'),
   body('active').optional().isBoolean().withMessage('Active must be a boolean'),
 ];
 
@@ -46,6 +55,15 @@ const updateAssessmentValidator = [
     .isIn(['easy', 'medium', 'hard'])
     .withMessage('Invalid difficulty'),
   body('count').optional().isInt({ min: 1, max: 100 }).withMessage('Count must be between 1 and 100'),
+  body('duration').optional().isInt({ min: 1 }).withMessage('Duration must be a positive number'),
+  body('passingScore').optional().isInt({ min: 0, max: 100 }).withMessage('Passing score must be between 0 and 100'),
+  body('topics').optional().isArray().withMessage('Topics must be an array'),
+  body('topics.*').optional().isString().withMessage('Topic must be a string'),
+  body('questions').optional().isArray().withMessage('Questions must be an array'),
+  body('questions.*.text').optional().isString(),
+  body('questions.*.options').optional().isArray().withMessage('Question options must be an array'),
+  body('questions.*.correctAnswer').optional().isInt({ min: 0 }).withMessage('Correct answer must be a non-negative integer'),
+  body('questions.*.marks').optional().isInt({ min: 1 }).withMessage('Question marks must be a positive integer'),
   body('active').optional().isBoolean().withMessage('Active must be a boolean'),
 ];
 

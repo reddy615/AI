@@ -450,6 +450,10 @@ exports.createAssessment = asyncHandler(async (req, res) => {
     category,
     difficulty,
     count,
+    duration,
+    passingScore,
+    topics,
+    questions,
     active,
     order,
   } = req.body;
@@ -462,6 +466,23 @@ exports.createAssessment = asyncHandler(async (req, res) => {
     category: category || '',
     difficulty: difficulty || 'medium',
     count: typeof count === 'number' ? count : 10,
+    duration: typeof duration === 'number' ? duration : 30,
+    passingScore: typeof passingScore === 'number' ? passingScore : 60,
+    topics: Array.isArray(topics)
+      ? topics.filter((topic) => typeof topic === 'string' && topic.trim()).map((topic) => topic.trim())
+      : [],
+    questions: Array.isArray(questions)
+      ? questions.map((question) => ({
+          text: String(question.text || ''),
+          options: Array.isArray(question.options)
+            ? question.options.map((option) => String(option || ''))
+            : [],
+          correctAnswer: Number(question.correctAnswer) || 0,
+          topic: String(question.topic || ''),
+          marks: Number(question.marks) || 1,
+          explanation: String(question.explanation || ''),
+        }))
+      : [],
     active: typeof active === 'boolean' ? active : true,
     order: typeof order === 'number' ? order : 0,
     createdBy: req.user && req.user._id ? req.user._id : null,
@@ -485,6 +506,10 @@ exports.updateAssessment = asyncHandler(async (req, res) => {
     'category',
     'difficulty',
     'count',
+    'duration',
+    'passingScore',
+    'topics',
+    'questions',
     'active',
     'order',
   ];
