@@ -2,7 +2,9 @@ const { body, param } = require('express-validator');
 const { ASSESSMENT_ACCESS_KEYS } = require('../utils/assessmentAccess');
 
 const assessmentUserIdValidator = [
-  param('id').isMongoId().withMessage('Valid user id is required'),
+  param('id')
+    .custom((value) => /^[a-f\d]{24}$/i.test(value) || /^local-[a-z\d_-]+$/i.test(value))
+    .withMessage('Valid user id is required'),
 ];
 
 const updateAssessmentAccessValidator = [
@@ -30,7 +32,14 @@ const updateAssessmentAccessValidator = [
     }),
 ];
 
+const bulkAssessmentAccessValidator = [
+  body('enabled')
+    .isBoolean()
+    .withMessage('Enabled must be a boolean'),
+];
+
 module.exports = {
   assessmentUserIdValidator,
   updateAssessmentAccessValidator,
+  bulkAssessmentAccessValidator,
 };

@@ -1,13 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { LockKeyhole, ShieldCheck, X } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  BrainCircuit,
+  Calculator,
+  Code2,
+  LoaderCircle,
+  MessagesSquare,
+  Search,
+  ShieldCheck,
+  Users,
+} from 'lucide-react'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
 import LoadingOverlay from '../components/LoadingOverlay'
 import { useToast } from '../components/ToastProvider'
 import { useLanguage } from '../context/LanguageContext'
 
-const tabs = ['overview', 'users', 'questions', 'interviews', 'reports']
+const tabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'users', label: 'Users' },
+  { id: 'assessments', label: 'Assessment Management' },
+  { id: 'questions', label: 'Questions' },
+  { id: 'interviews', label: 'Interviews' },
+  { id: 'reports', label: 'Reports' },
+]
 
 const emptyAssessmentAccess = {
   technical: false,
@@ -16,38 +32,97 @@ const emptyAssessmentAccess = {
   mockInterview: false,
 }
 
+const allAssessmentAccess = {
+  technical: true,
+  aptitude: true,
+  coding: true,
+  mockInterview: true,
+}
+
+const assessmentPageSize = 20
+
 const assessmentOptions = [
   {
     key: 'technical',
+    shortTitle: 'Technical',
     title: 'Technical Assessment',
     description: 'Core computer science and technical reasoning questions.',
+    icon: BrainCircuit,
+    accent: 'from-cyan-400 to-blue-500',
   },
   {
     key: 'aptitude',
+    shortTitle: 'Aptitude',
     title: 'Aptitude Assessment',
     description: 'Quantitative aptitude, logical reasoning, and verbal ability.',
+    icon: Calculator,
+    accent: 'from-violet-400 to-fuchsia-500',
   },
   {
     key: 'coding',
+    shortTitle: 'Coding',
     title: 'Coding Assessment',
     description: 'Programming challenges and evaluated code submissions.',
+    icon: Code2,
+    accent: 'from-emerald-400 to-teal-500',
   },
   {
     key: 'mockInterview',
+    shortTitle: 'Mock',
     title: 'Mock Interview Assessment',
     description: 'Role-focused AI mock interview sessions and feedback.',
+    icon: MessagesSquare,
+    accent: 'from-amber-300 to-orange-500',
   },
 ]
 
+function normalizeAssessmentAccess(access) {
+  return {
+    ...emptyAssessmentAccess,
+    ...(access || {}),
+  }
+}
+
+function buildLocalAssessmentSummary(users) {
+  const assessments = assessmentOptions.reduce((summary, assessment) => {
+    const usersWithAccess = users.filter(
+      (user) => normalizeAssessmentAccess(user.assessmentAccess)[assessment.key]
+    ).length
+
+    summary[assessment.key] = {
+      usersWithAccess,
+      active: usersWithAccess > 0,
+    }
+    return summary
+  }, {})
+
+  return {
+    totalUsers: users.length,
+    assessments,
+  }
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
-  const [data, setData] = useState({ summary: null, users: [], questions: [], interviews: [], reports: null, leaderboard: [] })
+  const [data, setData] = useState({
+    summary: null,
+    users: [],
+    questions: [],
+    interviews: [],
+    reports: null,
+    leaderboard: [],
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [assessmentAccessUser, setAssessmentAccessUser] = useState(null)
-  const [assessmentAccess, setAssessmentAccess] = useState(emptyAssessmentAccess)
-  const [assessmentAccessLoading, setAssessmentAccessLoading] = useState(false)
-  const [assessmentAccessSaving, setAssessmentAccessSaving] = useState(false)
+  const [assessmentUsers, setAssessmentUsers] = useState([])
+  const [assessmentTotal, setAssessmentTotal] = useState(0)
+  const [assessmentPage, setAssessmentPage] = useState(1)
+  const [assessmentSummary, setAssessmentSummary] = useState(null)
+  const [assessmentSearch, setAssessmentSearch] = useState('')
+  const [assessmentLoading, setAssessmentLoading] = useState(false)
+  const [assessmentUpdating, setAssessmentUpdating] = useState({})
+  const [bulkAssessmentUpdating, setBulkAssessmentUpdating] = useState(false)
+  const assessmentRequestId = useRef(0)
   const { t } = useLanguage()
   const toast = useToast()
 
@@ -106,24 +181,66 @@ export default function AdminDashboard() {
     loadData()
   }, [loadData])
 
-  useEffect(() => {
-    if (!assessmentAccessUser) return undefined
+  const loadAssessmentSummary = useCallback(async () => {
+    try {
+      const response = await api.get('/api/admin/assessment-access/summary')
+      const payload = response.data?.data || response.data
+      setAssessmentSummary(payload?.summary || null)
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to load assessment summary'
+      toast.error(message)
+    }
+  }, [toast])
 
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !assessmentAccessSaving) {
-        setAssessmentAccessUser(null)
+  const loadAssessmentUsers = useCallback(async ({ page = 1, search = '' } = {}) => {
+    const requestId = assessmentRequestId.current + 1
+    assessmentRequestId.current = requestId
+    setAssessmentLoading(true)
+
+    try {
+      const response = await api.get('/api/admin/users', {
+        params: {
+          page,
+          limit: assessmentPageSize,
+          search: search.trim() || undefined,
+        },
+      })
+      const payload = response.data?.data || response.data
+
+      if (requestId !== assessmentRequestId.current) return
+
+      setAssessmentUsers(payload?.users || [])
+      setAssessmentTotal(Number(payload?.total) || 0)
+    } catch (requestError) {
+      if (requestId !== assessmentRequestId.current) return
+      const message = requestError.response?.data?.message || 'Unable to load assessment users'
+      toast.error(message)
+    } finally {
+      if (requestId === assessmentRequestId.current) {
+        setAssessmentLoading(false)
       }
     }
+  }, [toast])
 
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
+  useEffect(() => {
+    if (activeTab !== 'assessments') return undefined
 
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [assessmentAccessSaving, assessmentAccessUser])
+    loadAssessmentSummary()
+    return undefined
+  }, [activeTab, loadAssessmentSummary])
+
+  useEffect(() => {
+    if (activeTab !== 'assessments') return undefined
+
+    const timer = window.setTimeout(() => {
+      loadAssessmentUsers({
+        page: assessmentPage,
+        search: assessmentSearch,
+      })
+    }, 250)
+
+    return () => window.clearTimeout(timer)
+  }, [activeTab, assessmentPage, assessmentSearch, loadAssessmentUsers])
 
   const metrics = useMemo(() => {
     if (!data.summary) return []
@@ -139,77 +256,145 @@ export default function AdminDashboard() {
 
   const [reminderLoading, setReminderLoading] = useState({})
 
-  const openAssessmentAccessModal = async (user) => {
+  const updateAssessmentAccess = async (user, assessmentKey) => {
     const userId = user?._id || user?.id
     if (!userId) {
       toast.error('User ID not found')
       return
     }
 
-    setAssessmentAccessUser(user)
-    setAssessmentAccess({
-      ...emptyAssessmentAccess,
-      ...(user.assessmentAccess || {}),
-    })
-    setAssessmentAccessLoading(true)
-
-    try {
-      const response = await api.get(`/api/admin/users/${userId}/assessment-access`)
-      const payload = response.data?.data || response.data
-      setAssessmentAccess({
-        ...emptyAssessmentAccess,
-        ...(payload?.assessmentAccess || {}),
-      })
-    } catch (requestError) {
-      const message = requestError.response?.data?.message || 'Unable to load assessment access'
-      toast.error(message)
-      setAssessmentAccessUser(null)
-    } finally {
-      setAssessmentAccessLoading(false)
+    const updateKey = `${userId}:${assessmentKey}`
+    if (Object.keys(assessmentUpdating).some((key) => key.startsWith(`${userId}:`))) {
+      return
     }
-  }
 
-  const saveAssessmentAccess = async () => {
-    const userId = assessmentAccessUser?._id || assessmentAccessUser?.id
-    if (!userId) return
+    const previousAccess = normalizeAssessmentAccess(user.assessmentAccess)
+    const nextValue = !previousAccess[assessmentKey]
+    const optimisticAccess = {
+      ...previousAccess,
+      [assessmentKey]: nextValue,
+    }
 
-    setAssessmentAccessSaving(true)
+    setAssessmentUpdating((current) => ({ ...current, [updateKey]: true }))
+    setAssessmentUsers((current) => current.map((item) => (
+      (item._id || item.id) === userId
+        ? { ...item, assessmentAccess: optimisticAccess }
+        : item
+    )))
+    setAssessmentSummary((current) => {
+      if (!current?.assessments?.[assessmentKey]) return current
+
+      const currentAssessment = current.assessments[assessmentKey]
+      const usersWithAccess = Math.max(
+        0,
+        Number(currentAssessment.usersWithAccess || 0) + (nextValue ? 1 : -1)
+      )
+
+      return {
+        ...current,
+        assessments: {
+          ...current.assessments,
+          [assessmentKey]: {
+            ...currentAssessment,
+            usersWithAccess,
+            active: usersWithAccess > 0,
+          },
+        },
+      }
+    })
+
     try {
       const response = await api.put(`/api/admin/users/${userId}/assessment-access`, {
-        assessmentAccess,
+        assessmentAccess: {
+          [assessmentKey]: nextValue,
+        },
       })
       const payload = response.data?.data || response.data
-      const updatedAccess = {
-        ...emptyAssessmentAccess,
-        ...(payload?.assessmentAccess || assessmentAccess),
-      }
+      const updatedAccess = normalizeAssessmentAccess(payload?.assessmentAccess || optimisticAccess)
 
+      setAssessmentUsers((current) => current.map((item) => (
+        (item._id || item.id) === userId
+          ? { ...item, assessmentAccess: updatedAccess }
+          : item
+      )))
       setData((current) => ({
         ...current,
-        users: current.users.map((user) => (
-          (user._id || user.id) === userId
-            ? { ...user, assessmentAccess: updatedAccess }
-            : user
+        users: current.users.map((item) => (
+          (item._id || item.id) === userId
+            ? { ...item, assessmentAccess: updatedAccess }
+            : item
         )),
       }))
-      setAssessmentAccess(updatedAccess)
-      setAssessmentAccessUser(null)
-      toast.success('Assessment access updated successfully')
+      loadAssessmentSummary()
     } catch (requestError) {
-      const message = requestError.response?.data?.message || 'Unable to save assessment access'
+      setAssessmentUsers((current) => current.map((item) => (
+        (item._id || item.id) === userId
+          ? { ...item, assessmentAccess: previousAccess }
+          : item
+      )))
+      setAssessmentSummary((current) => {
+        if (!current?.assessments?.[assessmentKey]) return current
+
+        const currentAssessment = current.assessments[assessmentKey]
+        const usersWithAccess = Math.max(
+          0,
+          Number(currentAssessment.usersWithAccess || 0) + (nextValue ? -1 : 1)
+        )
+
+        return {
+          ...current,
+          assessments: {
+            ...current.assessments,
+            [assessmentKey]: {
+              ...currentAssessment,
+              usersWithAccess,
+              active: usersWithAccess > 0,
+            },
+          },
+        }
+      })
+      const message = requestError.response?.data?.message || 'Unable to update assessment access'
       toast.error(message)
     } finally {
-      setAssessmentAccessSaving(false)
+      setAssessmentUpdating((current) => {
+        const next = { ...current }
+        delete next[updateKey]
+        return next
+      })
     }
   }
 
-  const grantAllAssessments = () => {
-    setAssessmentAccess({
-      technical: true,
-      aptitude: true,
-      coding: true,
-      mockInterview: true,
-    })
+  const bulkUpdateAssessmentAccess = async (enabled) => {
+    const action = enabled ? 'grant all assessment access' : 'revoke all assessment access'
+    if (!window.confirm(`Are you sure you want to ${action} for every user?`)) return
+
+    setBulkAssessmentUpdating(true)
+    try {
+      const response = await api.put('/api/admin/assessment-access/bulk', { enabled })
+      const payload = response.data?.data || response.data
+      const nextAccess = enabled ? allAssessmentAccess : emptyAssessmentAccess
+
+      setAssessmentUsers((current) => current.map((user) => ({
+        ...user,
+        assessmentAccess: { ...nextAccess },
+      })))
+      setData((current) => ({
+        ...current,
+        users: current.users.map((user) => ({
+          ...user,
+          assessmentAccess: { ...nextAccess },
+        })),
+      }))
+      setAssessmentSummary(payload?.summary || buildLocalAssessmentSummary(assessmentUsers))
+      toast.success(enabled
+        ? 'Assessment access granted to all users'
+        : 'Assessment access revoked for all users')
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Unable to update assessment access'
+      toast.error(message)
+    } finally {
+      setBulkAssessmentUpdating(false)
+    }
   }
 
   const updateUser = async (userId, payload) => {
@@ -446,30 +631,10 @@ export default function AdminDashboard() {
   )
 
   const renderUsers = () => (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-[1.75rem] border border-cyan-400/20 bg-slate-950 p-6 text-white shadow-xl sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-cyan-400/10 p-2.5 text-cyan-300">
-                <ShieldCheck className="h-6 w-6" aria-hidden="true" />
-              </div>
-              <h2 className="text-2xl font-bold">Assessment Access Management</h2>
-            </div>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Control which technical, aptitude, coding, and mock interview assessments each user can start.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-slate-300">
-            <span className="font-semibold text-white">{data.users.length}</span> users loaded
-          </div>
-        </div>
-      </section>
-
-      <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h2 className="text-xl font-bold text-slate-900">User Management</h2>
-        <p className="text-sm text-slate-500">Manage roles, account status, resumes, email reminders, and assessment permissions.</p>
+        <p className="text-sm text-slate-500">Manage roles, account status, resumes, and email reminders.</p>
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
@@ -557,13 +722,6 @@ export default function AdminDashboard() {
                     >
                       {user.isActive ? 'Deactivate' : 'Activate'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => openAssessmentAccessModal(user)}
-                      className="rounded-full bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-cyan-700"
-                    >
-                      Assessment Access
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -577,10 +735,10 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
-      </div>
     </div>
   )
 
+  /*
   const renderAssessmentAccessModal = () => {
     const accessEnabled = Object.values(assessmentAccess).some(Boolean)
 
@@ -720,6 +878,274 @@ export default function AdminDashboard() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+    )
+  }
+
+  */
+
+  const renderUserAssessmentControls = (user) => {
+    const userId = user._id || user.id
+    const access = normalizeAssessmentAccess(user.assessmentAccess)
+    const userIsUpdating = Object.keys(assessmentUpdating).some(
+      (key) => key.startsWith(`${userId}:`)
+    )
+
+    return (
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+        {assessmentOptions.map((assessment) => {
+          const enabled = access[assessment.key]
+          const updating = Boolean(assessmentUpdating[`${userId}:${assessment.key}`])
+
+          return (
+            <div
+              key={assessment.key}
+              className="flex min-w-[8.25rem] items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-950/70 px-3 py-2"
+            >
+              <span className="text-xs font-medium text-slate-300">{assessment.shortTitle}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                aria-label={`${enabled ? 'Disable' : 'Enable'} ${assessment.title} for ${user.name}`}
+                disabled={bulkAssessmentUpdating || userIsUpdating}
+                onClick={() => updateAssessmentAccess(user, assessment.key)}
+                className={`relative h-5 w-9 shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-wait disabled:opacity-60 ${
+                  enabled ? 'bg-cyan-500' : 'bg-slate-600'
+                }`}
+              >
+                {updating ? (
+                  <LoaderCircle className="absolute left-2.5 top-1 h-3 w-3 animate-spin text-white" />
+                ) : (
+                  <span
+                    className={`absolute top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+                      enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                )}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderAssessments = () => {
+    const summary = assessmentSummary || buildLocalAssessmentSummary(assessmentUsers)
+    const totalPages = Math.max(1, Math.ceil(assessmentTotal / assessmentPageSize))
+    const firstVisibleUser = assessmentTotal
+      ? ((assessmentPage - 1) * assessmentPageSize) + 1
+      : 0
+    const lastVisibleUser = Math.min(assessmentPage * assessmentPageSize, assessmentTotal)
+
+    return (
+      <div className="overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 text-white shadow-2xl shadow-slate-950/20">
+        <section className="border-b border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.15),transparent_35%),linear-gradient(135deg,#020617_0%,#0f172a_100%)] p-6 sm:p-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex items-center gap-3 text-cyan-300">
+                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3">
+                  <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em]">Centralized permissions</p>
+              </div>
+              <h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Assessment Management</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
+                Manage every assessment permission from one workspace. Changes save as soon as a switch is updated.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => bulkUpdateAssessmentAccess(true)}
+                disabled={bulkAssessmentUpdating}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-950/40 hover:from-cyan-400 hover:to-blue-500 disabled:cursor-wait disabled:opacity-60"
+              >
+                {bulkAssessmentUpdating && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                Grant Access To All
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkUpdateAssessmentAccess(false)}
+                disabled={bulkAssessmentUpdating}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-200 hover:bg-rose-400/20 disabled:cursor-wait disabled:opacity-60"
+              >
+                Revoke All Access
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div className="space-y-8 p-4 sm:p-6 lg:p-8">
+          <section aria-labelledby="assessment-types-title">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Section A</p>
+                <h3 id="assessment-types-title" className="mt-2 text-xl font-bold">Assessment Types</h3>
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-400">
+                <Users className="h-3.5 w-3.5" />
+                {summary.totalUsers || assessmentTotal} total users
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+              {assessmentOptions.map((assessment, index) => {
+                const Icon = assessment.icon
+                const details = summary.assessments?.[assessment.key] || {
+                  usersWithAccess: 0,
+                  active: false,
+                }
+
+                return (
+                  <motion.article
+                    key={assessment.key}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.04 }}
+                    className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 p-5"
+                  >
+                    <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${assessment.accent}`} />
+                    <div className="flex items-start justify-between gap-4">
+                      <div className={`rounded-xl bg-gradient-to-br ${assessment.accent} p-2.5 text-slate-950 shadow-lg`}>
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                        details.active
+                          ? 'bg-emerald-400/10 text-emerald-300'
+                          : 'bg-slate-800 text-slate-500'
+                      }`}>
+                        {details.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <h4 className="mt-5 font-bold text-slate-100">{assessment.title}</h4>
+                    <p className="mt-2 min-h-[2.5rem] text-sm leading-5 text-slate-500">{assessment.description}</p>
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <div className="text-2xl font-bold text-white">{details.usersWithAccess || 0}</div>
+                      <div className="text-xs text-slate-500">users with access</div>
+                    </div>
+                  </motion.article>
+                )
+              })}
+            </div>
+          </section>
+
+          <section aria-labelledby="user-access-title" className="rounded-2xl border border-white/10 bg-slate-900/70">
+            <div className="border-b border-white/10 p-4 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Section B</p>
+                  <h3 id="user-access-title" className="mt-2 text-xl font-bold">User Access Control</h3>
+                  <p className="mt-1 text-sm text-slate-500">Search users and update individual assessment permissions.</p>
+                </div>
+                <label className="relative block w-full lg:max-w-sm">
+                  <span className="sr-only">Search users</span>
+                  <Search className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
+                  <input
+                    type="search"
+                    value={assessmentSearch}
+                    onChange={(event) => {
+                      setAssessmentSearch(event.target.value)
+                      setAssessmentPage(1)
+                    }}
+                    placeholder="Search by name or email"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {assessmentLoading ? (
+              <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-400">
+                <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" />
+                Loading users...
+              </div>
+            ) : assessmentUsers.length ? (
+              <>
+                <div className="space-y-3 p-4 lg:hidden">
+                  {assessmentUsers.map((user) => (
+                    <article key={user._id || user.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-white">{user.name}</div>
+                          <div className="truncate text-xs text-slate-500">{user.email}</div>
+                        </div>
+                        <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                          {user.role}
+                        </span>
+                      </div>
+                      <div className="mt-4">{renderUserAssessmentControls(user)}</div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto lg:block">
+                  <table className="min-w-full text-sm">
+                    <thead className="border-b border-white/10 bg-slate-950/60 text-left text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                      <tr>
+                        <th className="px-5 py-4 font-semibold">Name</th>
+                        <th className="px-5 py-4 font-semibold">Email</th>
+                        <th className="px-5 py-4 font-semibold">Role</th>
+                        <th className="min-w-[36rem] px-5 py-4 font-semibold">Assessment Access</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {assessmentUsers.map((user) => (
+                        <tr key={user._id || user.id} className="hover:bg-white/[0.025]">
+                          <td className="px-5 py-4 font-semibold text-slate-100">{user.name}</td>
+                          <td className="px-5 py-4 text-slate-400">{user.email}</td>
+                          <td className="px-5 py-4">
+                            <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">{renderUserAssessmentControls(user)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
+                <div className="rounded-2xl bg-white/5 p-4 text-slate-500">
+                  <Users className="h-6 w-6" />
+                </div>
+                <div className="mt-4 font-semibold text-slate-200">No users found</div>
+                <div className="mt-1 text-sm text-slate-500">Try a different name or email address.</div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 border-t border-white/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="text-slate-500">
+                Showing {firstVisibleUser}-{lastVisibleUser} of {assessmentTotal}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssessmentPage((current) => Math.max(1, current - 1))}
+                  disabled={assessmentPage <= 1 || assessmentLoading}
+                  className="rounded-lg border border-slate-700 px-3 py-2 font-semibold text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="px-2 text-xs font-semibold text-slate-500">
+                  Page {assessmentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAssessmentPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={assessmentPage >= totalPages || assessmentLoading}
+                  className="rounded-lg border border-slate-700 px-3 py-2 font-semibold text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
     )
   }
 
@@ -927,23 +1353,45 @@ export default function AdminDashboard() {
             >
               {loading ? 'Refreshing...' : 'Refresh'}
             </button>
-            {tabs.map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900' : 'bg-white/10 text-white hover:bg-white/20'}`}>
-                {tab}
-              </button>
-            ))}
           </div>
         </div>
       </section>
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+        <aside className="self-start rounded-[1.5rem] border border-slate-800 bg-slate-950 p-3 text-white shadow-xl lg:sticky lg:top-24">
+          <div className="px-3 pb-3 pt-2">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Admin workspace</div>
+            <div className="mt-1 text-sm text-slate-400">Management tools</div>
+          </div>
+          <nav aria-label="Admin sections" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`whitespace-nowrap rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-950/30'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
 
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'users' && renderUsers()}
-      {activeTab === 'questions' && renderQuestions()}
-      {activeTab === 'interviews' && renderInterviews()}
-      {activeTab === 'reports' && renderReports()}
-      {renderAssessmentAccessModal()}
+        <main className="min-w-0">
+          {error ? <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'users' && renderUsers()}
+          {activeTab === 'assessments' && renderAssessments()}
+          {activeTab === 'questions' && renderQuestions()}
+          {activeTab === 'interviews' && renderInterviews()}
+          {activeTab === 'reports' && renderReports()}
+        </main>
+      </div>
     </div>
   )
 }

@@ -11,6 +11,12 @@ const { sendError } = require('../utils/apiResponse');
 const { getLeaderboard } = require('../services/gamificationService');
 const { sendEmail } = require('../utils/sendEmail');
 const {
+  LOCAL_USERS,
+  findLocalUserById,
+  updateLocalUser,
+} = require('../config/localUsers');
+const {
+  ASSESSMENT_ACCESS_KEYS,
   normalizeAssessmentAccess,
   mergeAssessmentAccess,
   hasAnyAssessmentAccess,
@@ -139,6 +145,57 @@ function toCount(value) {
   return Number(value) || 0;
 }
 
+function buildAssessmentAccessSummaryFromUsers(users) {
+  const assessments = ASSESSMENT_ACCESS_KEYS.reduce((summary, key) => {
+    const usersWithAccess = users.filter(
+      (user) => normalizeAssessmentAccess(user.assessmentAccess)[key]
+    ).length;
+
+    summary[key] = {
+      usersWithAccess,
+      active: usersWithAccess > 0,
+    };
+    return summary;
+  }, {});
+
+  return {
+    totalUsers: users.length,
+    assessments,
+  };
+}
+
+async function buildAssessmentAccessSummary() {
+  const [totalUsers, technical, aptitude, coding, mockInterview] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ 'assessmentAccess.technical': true }),
+    User.countDocuments({ 'assessmentAccess.aptitude': true }),
+    User.countDocuments({ 'assessmentAccess.coding': true }),
+    User.countDocuments({ 'assessmentAccess.mockInterview': true }),
+  ]);
+
+  return {
+    totalUsers,
+    assessments: {
+      technical: {
+        usersWithAccess: technical,
+        active: technical > 0,
+      },
+      aptitude: {
+        usersWithAccess: aptitude,
+        active: aptitude > 0,
+      },
+      coding: {
+        usersWithAccess: coding,
+        active: coding > 0,
+      },
+      mockInterview: {
+        usersWithAccess: mockInterview,
+        active: mockInterview > 0,
+      },
+    },
+  };
+}
+
 async function runAdminQuery(label, task, fallback) {
   if (!isMongoReady()) {
     return fallback;
@@ -226,12 +283,48 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
 
-  const directCount = await runAdminQuery('users.directCount', () => User.countDocuments(query), 0);
-  const directFirstFive = await runAdminQuery(
-    'users.directFirstFive',
-    () => User.find(query).select('_id name email role').sort({ createdAt: -1 }).limit(5).lean(),
-    []
-  );
+  if (!isMongoReady()) {
+    const normalizedSearch = String(search || '').trim().toLowerCase();
+    const filteredUsers = LOCAL_USERS.filter((user) => {
+      const matchesSearch = !normalizedSearch
+        || user.name.toLowerCase().includes(normalizedSearch)
+        || user.email.toLowerCase().includes(normalizedSearch);
+      const matchesRole = !role || user.role === role;
+      const matchesActive = isActive !== 'true' && isActive !== 'false'
+        ? true
+        : user.isActive === (isActive === 'true');
+
+      return matchesSearch && matchesRole && matchesActive;
+    });
+    const pageStart = (safePage - 1) * safeLimit;
+    const users = filteredUsers.slice(pageStart, pageStart + safeLimit).map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      preferredLanguage: user.preferredLanguage,
+      xp: 0,
+      level: 1,
+      streak: 0,
+      badges: [],
+      resumeUrl: null,
+      resumeFileName: null,
+      resumeUploadedAt: null,
+      hasResume: false,
+      assessmentAccess: normalizeAssessmentAccess(user.assessmentAccess),
+    }));
+
+    return res.apiSuccess(
+      {
+        users,
+        total: filteredUsers.length,
+        page: safePage,
+        limit: safeLimit,
+      },
+      'Users loaded'
+    );
+  }
 
   const [usersResult, totalResult] = await Promise.allSettled([
     runAdminQuery(
@@ -514,7 +607,24 @@ exports.sendResumeReminder = asyncHandler(async (req, res) => {
 
 exports.getAssessmentAccess = asyncHandler(async (req, res) => {
   if (!isMongoReady()) {
-    return sendError(res, 'Database unavailable', 503);
+    const user = findLocalUserById(req.params.id);
+    if (!user) {
+      return sendError(res, 'User not found', 404);
+    }
+
+    const assessmentAccess = normalizeAssessmentAccess(user.assessmentAccess);
+    return res.apiSuccess(
+      {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        assessmentAccess,
+        enabled: hasAnyAssessmentAccess(assessmentAccess),
+      },
+      'Assessment access loaded'
+    );
   }
 
   const user = await User.findById(req.params.id)
@@ -543,22 +653,48 @@ exports.getAssessmentAccess = asyncHandler(async (req, res) => {
 
 exports.updateAssessmentAccess = asyncHandler(async (req, res) => {
   if (!isMongoReady()) {
-    return sendError(res, 'Database unavailable', 503);
+    const currentUser = findLocalUserById(req.params.id);
+    if (!currentUser) {
+      return sendError(res, 'User not found', 404);
+    }
+
+    const assessmentAccess = mergeAssessmentAccess(
+      currentUser.assessmentAccess,
+      req.body.assessmentAccess
+    );
+    const user = updateLocalUser(req.params.id, { assessmentAccess });
+
+    return res.apiSuccess(
+      {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        assessmentAccess,
+        enabled: hasAnyAssessmentAccess(assessmentAccess),
+      },
+      'Assessment access updated'
+    );
   }
 
-  const user = await User.findById(req.params.id);
+  const assessmentAccessUpdate = Object.entries(req.body.assessmentAccess)
+    .reduce((updates, [key, enabled]) => {
+      updates[`assessmentAccess.${key}`] = enabled;
+      return updates;
+    }, {});
+
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { $set: assessmentAccessUpdate },
+    { new: true, runValidators: true }
+  ).select('name email assessmentAccess');
+
   if (!user) {
     return sendError(res, 'User not found', 404);
   }
 
-  const assessmentAccess = mergeAssessmentAccess(
-    user.assessmentAccess,
-    req.body.assessmentAccess
-  );
-
-  user.assessmentAccess = assessmentAccess;
-  user.markModified('assessmentAccess');
-  await user.save();
+  const assessmentAccess = normalizeAssessmentAccess(user.assessmentAccess);
 
   return res.apiSuccess(
     {
@@ -571,5 +707,70 @@ exports.updateAssessmentAccess = asyncHandler(async (req, res) => {
       enabled: hasAnyAssessmentAccess(assessmentAccess),
     },
     'Assessment access updated'
+  );
+});
+
+exports.getAssessmentAccessSummary = asyncHandler(async (req, res) => {
+  if (!isMongoReady()) {
+    return res.apiSuccess(
+      { summary: buildAssessmentAccessSummaryFromUsers(LOCAL_USERS) },
+      'Assessment access summary loaded'
+    );
+  }
+
+  const summary = await buildAssessmentAccessSummary();
+  return res.apiSuccess({ summary }, 'Assessment access summary loaded');
+});
+
+exports.bulkUpdateAssessmentAccess = asyncHandler(async (req, res) => {
+  const enabled = req.body.enabled === true;
+  const nextAssessmentAccess = ASSESSMENT_ACCESS_KEYS.reduce((access, key) => {
+    access[key] = enabled;
+    return access;
+  }, {});
+
+  if (!isMongoReady()) {
+    let modifiedUsers = 0;
+    LOCAL_USERS.forEach((user) => {
+      const previousAccess = normalizeAssessmentAccess(user.assessmentAccess);
+      if (ASSESSMENT_ACCESS_KEYS.some((key) => previousAccess[key] !== enabled)) {
+        modifiedUsers += 1;
+      }
+      updateLocalUser(user.id, {
+        assessmentAccess: { ...nextAssessmentAccess },
+      });
+    });
+
+    return res.apiSuccess(
+      {
+        enabled,
+        matchedUsers: LOCAL_USERS.length,
+        modifiedUsers,
+        summary: buildAssessmentAccessSummaryFromUsers(LOCAL_USERS),
+      },
+      enabled
+        ? 'Assessment access granted to all users'
+        : 'Assessment access revoked for all users'
+    );
+  }
+
+  const assessmentAccessUpdate = ASSESSMENT_ACCESS_KEYS.reduce((updates, key) => {
+    updates[`assessmentAccess.${key}`] = enabled;
+    return updates;
+  }, {});
+
+  const result = await User.updateMany({}, { $set: assessmentAccessUpdate });
+  const summary = await buildAssessmentAccessSummary();
+
+  return res.apiSuccess(
+    {
+      enabled,
+      matchedUsers: result.matchedCount || 0,
+      modifiedUsers: result.modifiedCount || 0,
+      summary,
+    },
+    enabled
+      ? 'Assessment access granted to all users'
+      : 'Assessment access revoked for all users'
   );
 });
