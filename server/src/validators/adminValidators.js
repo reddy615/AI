@@ -1,6 +1,6 @@
 const { body, param } = require('express-validator');
 const { ASSESSMENT_ACCESS_KEYS } = require('../utils/assessmentAccess');
-const QUIZ_ASSESSMENT_KEYS = ['technical', 'aptitude', 'coding', 'mockInterview'];
+const QUIZ_ASSESSMENT_KEYS = ['technical', 'aptitude', 'coding', 'mockInterview', 'Practice Test'];
 
 const assessmentUserIdValidator = [
   param('id')

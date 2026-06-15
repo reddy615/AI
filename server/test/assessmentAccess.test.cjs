@@ -23,6 +23,7 @@ test('User schema defaults every assessment permission to false', () => {
     aptitude: false,
     coding: false,
     mockInterview: false,
+    'Practice Test': false,
   });
 });
 
@@ -32,6 +33,7 @@ test('legacy users without assessment access normalize safely', () => {
     aptitude: false,
     coding: false,
     mockInterview: false,
+    'Practice Test': false,
   });
   assert.equal(hasAnyAssessmentAccess(undefined), false);
 });
@@ -43,6 +45,7 @@ test('partial assessment updates preserve existing grants and revoke selected ac
       aptitude: true,
       coding: false,
       mockInterview: false,
+      'Practice Test': false,
     },
     {
       aptitude: false,
@@ -55,6 +58,7 @@ test('partial assessment updates preserve existing grants and revoke selected ac
     aptitude: false,
     coding: true,
     mockInterview: false,
+    'Practice Test': false,
   });
   assert.equal(hasAnyAssessmentAccess(updated), true);
 });

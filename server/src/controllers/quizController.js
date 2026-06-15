@@ -147,8 +147,35 @@ async function ensureQuizQuestions(module, match, redis, poolKey) {
 
 // Start a quiz: fetch randomized questions based on query filters
 exports.startQuiz = asyncHandler(async (req, res) => {
-  const { module = 'aptitude', difficulty, category, count = 10 } = req.query;
+  const { assessmentId, module = 'aptitude', difficulty, category, count = 10 } = req.query;
   const safeCount = Math.min(Number(count) || 10, 50);
+
+  if (assessmentId && mongoose.isValidObjectId(assessmentId)) {
+    const Assessment = require('../models/Assessment');
+    const assessment = await Assessment.findById(assessmentId).lean();
+    if (!assessment) {
+      return sendError(res, 'Assessment not found', 404);
+    }
+    if (!assessment.active) {
+      return sendError(res, 'Assessment is not active', 403);
+    }
+
+    const payload = (assessment.questions || []).map((question, index) => {
+      const id = question._id || `q-${assessmentId}-${index}`;
+      return {
+        id,
+        text: question.text,
+        options: question.options.map(opt => typeof opt === 'string' ? { text: opt } : opt),
+        explanation: question.explanation || '',
+        marks: question.marks || 1,
+        negativeMarks: question.negativeMarks || 0,
+        topic: question.topic || question.category || 'General',
+        category: question.category || '',
+      };
+    });
+
+    return res.apiSuccess({ questions: payload, count: payload.length, title: assessment.title, assessmentId: assessment._id }, 'Quiz loaded');
+  }
 
   if (module === 'aptitude') {
     const payload = buildAptitudePracticeQuestions(2);
@@ -233,34 +260,65 @@ exports.startQuiz = asyncHandler(async (req, res) => {
 
 // Submit answers, calculate score, save Attempt
 exports.submitAnswers = asyncHandler(async (req, res) => {
-  const { module, difficulty, category, durationSeconds, answers } = req.body;
+  const { assessmentId, module, difficulty, category, durationSeconds, answers } = req.body;
   if (!answers || typeof answers !== 'object') return sendError(res, 'Answers required', 400);
 
-  const dbQuestionIds = Object.keys(answers).filter((id) => mongoose.isValidObjectId(id));
-  const localQuestionIds = Object.keys(answers).filter((id) => !mongoose.isValidObjectId(id));
-
   const questionsById = new Map();
+  let submitModule = module;
+  let submitCategory = category;
 
-  if (dbQuestionIds.length && mongoose.connection.readyState === 1) {
+  if (assessmentId && mongoose.isValidObjectId(assessmentId) && mongoose.connection.readyState === 1) {
     try {
-      const questions = await Question.find({ _id: { $in: dbQuestionIds.map((id) => new mongoose.Types.ObjectId(id)) } })
-        .select('module category topic text options correctIndex marks negativeMarks');
-      questions.forEach((question) => questionsById.set(String(question._id), question));
+      const Assessment = require('../models/Assessment');
+      const assessment = await Assessment.findById(assessmentId).lean();
+      if (assessment) {
+        submitModule = assessment.accessKey || module;
+        submitCategory = assessment.accessKey || category;
+        (assessment.questions || []).forEach((q, index) => {
+          const qId = q._id || `q-${assessmentId}-${index}`;
+          questionsById.set(String(qId), {
+            _id: qId,
+            text: q.text,
+            options: q.options.map(o => typeof o === 'string' ? { text: o } : o),
+            correctIndex: q.correctAnswer,
+            topic: q.topic || q.category || 'General',
+            category: q.category || '',
+            module: q.category || '',
+            marks: q.marks || 1,
+            negativeMarks: q.negativeMarks || 0,
+          });
+        });
+      }
     } catch (error) {
-      console.warn('Quiz database unavailable during submit, using local cache', error.message);
+      console.warn('Unable to load assessment questions during submit', error.message);
     }
   }
 
-  localQuestionIds.forEach((questionId) => {
-    const question = getLocalQuizQuestion(questionId);
-    if (question) {
-      questionsById.set(questionId, question);
+  if (questionsById.size === 0) {
+    const dbQuestionIds = Object.keys(answers).filter((id) => mongoose.isValidObjectId(id));
+    const localQuestionIds = Object.keys(answers).filter((id) => !mongoose.isValidObjectId(id));
+
+    if (dbQuestionIds.length && mongoose.connection.readyState === 1) {
+      try {
+        const questions = await Question.find({ _id: { $in: dbQuestionIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+          .select('module category topic text options correctIndex marks negativeMarks');
+        questions.forEach((question) => questionsById.set(String(question._id), question));
+      } catch (error) {
+        console.warn('Quiz database unavailable during submit, using local cache', error.message);
+      }
     }
-  });
+
+    localQuestionIds.forEach((questionId) => {
+      const question = getLocalQuizQuestion(questionId);
+      if (question) {
+        questionsById.set(questionId, question);
+      }
+    });
+  }
 
   const { score, correct, wrong, skipped, answerRecords } = scoreQuizAnswers(questionsById, answers);
   const totalQuestions = questionsById.size;
-  const topicAnalytics = aggregateTopicAnalytics([{ module, category, answers: answerRecords }]);
+  const topicAnalytics = aggregateTopicAnalytics([{ module: submitModule, category: submitCategory, answers: answerRecords }]);
 
   const isDatabaseAvailable = mongoose.connection.readyState === 1;
 
@@ -271,9 +329,9 @@ exports.submitAnswers = asyncHandler(async (req, res) => {
       id: attemptId,
       user: req.user.id,
       userId: req.user.id,
-      module,
+      module: submitModule,
       difficulty,
-      category,
+      category: submitCategory,
       totalQuestions,
       answers: answerRecords,
       score,
@@ -300,9 +358,9 @@ exports.submitAnswers = asyncHandler(async (req, res) => {
   const attempt = await Attempt.create({
     user: req.user.id,
     userId: req.user.id,
-    module,
+    module: submitModule,
     difficulty,
-    category,
+    category: submitCategory,
     totalQuestions,
     answers: answerRecords,
     score,
@@ -321,7 +379,7 @@ exports.submitAnswers = asyncHandler(async (req, res) => {
       source: 'quiz',
       score,
       accuracy,
-      module,
+      module: submitModule,
       durationSeconds: Number(durationSeconds) || 0,
     });
   } catch (error) {

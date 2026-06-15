@@ -3,6 +3,7 @@ const ASSESSMENT_ACCESS_KEYS = [
   'aptitude',
   'coding',
   'mockInterview',
+  'Practice Test',
 ];
 
 const DEFAULT_ASSESSMENT_ACCESS = Object.freeze({
@@ -10,6 +11,7 @@ const DEFAULT_ASSESSMENT_ACCESS = Object.freeze({
   aptitude: false,
   coding: false,
   mockInterview: false,
+  'Practice Test': false,
 });
 
 function normalizeAssessmentAccess(value = {}) {

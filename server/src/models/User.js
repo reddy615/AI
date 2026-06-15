@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
     aptitude: { type: Boolean, default: false },
     coding: { type: Boolean, default: false },
     mockInterview: { type: Boolean, default: false },
+    'Practice Test': { type: Boolean, default: false },
   },
   refreshTokenVersion: { type: Number, default: 0 },
 }, { timestamps: true });

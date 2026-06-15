@@ -14,9 +14,18 @@ function requireAssessmentAccess(accessKeyOrResolver) {
         return next();
       }
 
-      const accessKey = typeof accessKeyOrResolver === 'function'
+      let accessKey = typeof accessKeyOrResolver === 'function'
         ? accessKeyOrResolver(req)
         : accessKeyOrResolver;
+
+      const assessmentId = req.query?.assessmentId || req.body?.assessmentId;
+      if (assessmentId && mongoose.isValidObjectId(assessmentId)) {
+        const Assessment = require('../models/Assessment');
+        const assessment = await Assessment.findById(assessmentId).select('accessKey').lean();
+        if (assessment) {
+          accessKey = assessment.accessKey;
+        }
+      }
 
       if (!accessKey) {
         return res.status(400).json({

@@ -34,6 +34,7 @@ const emptyAssessmentAccess = {
   aptitude: false,
   coding: false,
   mockInterview: false,
+  'Practice Test': false,
 }
 
 const allAssessmentAccess = {
@@ -41,6 +42,7 @@ const allAssessmentAccess = {
   aptitude: true,
   coding: true,
   mockInterview: true,
+  'Practice Test': true,
 }
 
 const assessmentPageSize = 20
@@ -77,6 +79,14 @@ const assessmentOptions = [
     description: 'Role-focused AI mock interview sessions and feedback.',
     icon: MessagesSquare,
     accent: 'from-amber-300 to-orange-500',
+  },
+  {
+    key: 'Practice Test',
+    shortTitle: 'Practice',
+    title: 'Practice Test',
+    description: 'Mixed-topic evaluation practice tests with section analytics.',
+    icon: BrainCircuit,
+    accent: 'from-pink-400 to-rose-500',
   },
 ]
 
@@ -291,6 +301,7 @@ export default function AdminDashboard() {
         options: ['', '', '', ''],
         correctAnswer: 0,
         topic: '',
+        category: '',
         marks: '1',
         explanation: '',
       },
@@ -303,6 +314,7 @@ export default function AdminDashboard() {
     options: ['', '', '', ''],
     correctAnswer: 0,
     topic: '',
+    category: assessmentForm.type === 'Practice Test' ? 'Aptitude' : '',
     marks: '1',
     explanation: '',
   })
@@ -333,6 +345,7 @@ export default function AdminDashboard() {
           options: Array.isArray(question.options) ? question.options.slice(0, 4).concat(['', '', '', '']).slice(0, 4) : ['', '', '', ''],
           correctAnswer: typeof question.correctAnswer === 'number' ? question.correctAnswer : 0,
           topic: question.topic || '',
+          category: question.category || '',
           marks: String(question.marks || 1),
           explanation: question.explanation || '',
         }))
@@ -381,7 +394,8 @@ export default function AdminDashboard() {
           text: question.text,
           options: question.options.map((option) => option || ''),
           correctAnswer: Number(question.correctAnswer) || 0,
-          topic: question.topic,
+          topic: question.topic || question.category || '',
+          category: question.category || '',
           marks: Number(question.marks) || 1,
           explanation: question.explanation,
         })),
@@ -1184,7 +1198,16 @@ export default function AdminDashboard() {
                 <span className="text-sm font-semibold text-slate-200">Type</span>
                 <select
                   value={assessmentForm.type}
-                  onChange={(event) => setAssessmentForm((current) => ({ ...current, type: event.target.value }))}
+                  onChange={(event) => {
+                    const selectedType = event.target.value
+                    setAssessmentForm((current) => ({
+                      ...current,
+                      type: selectedType,
+                      topics: selectedType === 'Practice Test'
+                        ? 'Coding, Aptitude, Verbal, Reasoning, Advanced Aptitude'
+                        : current.topics
+                    }))
+                  }}
                   className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
                 >
                   {assessmentOptions.map((option) => (
@@ -1262,16 +1285,47 @@ export default function AdminDashboard() {
               />
             </label>
 
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-200">Topics</span>
-              <input
-                type="text"
-                value={assessmentForm.topics}
-                onChange={(event) => setAssessmentForm((current) => ({ ...current, topics: event.target.value }))}
-                placeholder="Comma-separated topics"
-                className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-              />
-            </label>
+            {assessmentForm.type === 'Practice Test' ? (
+              <div className="block">
+                <span className="text-sm font-semibold text-slate-200">Practice Test Sections / Categories Included</span>
+                <div className="mt-3 flex flex-wrap gap-4">
+                  {['Coding', 'Aptitude', 'Verbal', 'Reasoning', 'Advanced Aptitude'].map((cat) => {
+                    const currentTopics = assessmentForm.topics ? assessmentForm.topics.split(',').map(t => t.trim()) : []
+                    const checked = currentTopics.includes(cat)
+                    return (
+                      <label key={cat} className="inline-flex items-center gap-2 cursor-pointer bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 hover:border-cyan-400 transition">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            let nextTopics = [...currentTopics]
+                            if (e.target.checked) {
+                              if (!nextTopics.includes(cat)) nextTopics.push(cat)
+                            } else {
+                              nextTopics = nextTopics.filter(t => t !== cat)
+                            }
+                            setAssessmentForm(current => ({ ...current, topics: nextTopics.join(', ') }))
+                          }}
+                          className="rounded text-cyan-500 focus:ring-cyan-500/20 bg-slate-950 border-slate-700"
+                        />
+                        <span className="text-sm text-slate-200">{cat}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">Topics</span>
+                <input
+                  type="text"
+                  value={assessmentForm.topics}
+                  onChange={(event) => setAssessmentForm((current) => ({ ...current, topics: event.target.value }))}
+                  placeholder="Comma-separated topics"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                />
+              </label>
+            )}
 
             <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -1358,16 +1412,33 @@ export default function AdminDashboard() {
                             className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
                           />
                         </label>
-                        <label className="block">
-                          <span className="text-xs font-semibold text-slate-400">Topic</span>
-                          <input
-                            type="text"
-                            value={question.topic}
-                            onChange={(event) => updateQuestionDraft(index, 'topic', event.target.value)}
-                            className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-                            placeholder="Optional topic"
-                          />
-                        </label>
+                        {assessmentForm.type === 'Practice Test' ? (
+                          <label className="block">
+                            <span className="text-xs font-semibold text-slate-400">Category / Section</span>
+                            <select
+                              value={question.category || 'Aptitude'}
+                              onChange={(event) => updateQuestionDraft(index, 'category', event.target.value)}
+                              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                            >
+                              <option value="Coding">Coding</option>
+                              <option value="Aptitude">Aptitude</option>
+                              <option value="Verbal">Verbal</option>
+                              <option value="Reasoning">Reasoning</option>
+                              <option value="Advanced Aptitude">Advanced Aptitude</option>
+                            </select>
+                          </label>
+                        ) : (
+                          <label className="block">
+                            <span className="text-xs font-semibold text-slate-400">Topic</span>
+                            <input
+                              type="text"
+                              value={question.topic}
+                              onChange={(event) => updateQuestionDraft(index, 'topic', event.target.value)}
+                              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                              placeholder="Optional topic"
+                            />
+                          </label>
+                        )}
                       </div>
                       <label className="block">
                         <span className="text-xs font-semibold text-slate-400">Explanation</span>

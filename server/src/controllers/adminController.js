@@ -261,12 +261,13 @@ function buildAssessmentAccessSummaryFromUsers(users) {
 }
 
 async function buildAssessmentAccessSummary() {
-  const [totalUsers, technical, aptitude, coding, mockInterview] = await Promise.all([
+  const [totalUsers, technical, aptitude, coding, mockInterview, practiceTest] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ 'assessmentAccess.technical': true }),
     User.countDocuments({ 'assessmentAccess.aptitude': true }),
     User.countDocuments({ 'assessmentAccess.coding': true }),
     User.countDocuments({ 'assessmentAccess.mockInterview': true }),
+    User.countDocuments({ 'assessmentAccess.Practice Test': true }),
   ]);
 
   return {
@@ -287,6 +288,10 @@ async function buildAssessmentAccessSummary() {
       mockInterview: {
         usersWithAccess: mockInterview,
         active: mockInterview > 0,
+      },
+      'Practice Test': {
+        usersWithAccess: practiceTest,
+        active: practiceTest > 0,
       },
     },
   };
@@ -602,6 +607,7 @@ exports.createAssessment = asyncHandler(async (req, res) => {
             : [],
           correctAnswer: Number(question.correctAnswer) || 0,
           topic: String(question.topic || ''),
+          category: String(question.category || ''),
           marks: Number(question.marks) || 1,
           explanation: String(question.explanation || ''),
         }))

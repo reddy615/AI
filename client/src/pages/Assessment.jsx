@@ -20,6 +20,7 @@ const emptyAssessmentAccess = {
   aptitude: false,
   coding: false,
   mockInterview: false,
+  'Practice Test': false,
 }
 
 const staticAssessments = [
@@ -57,6 +58,11 @@ const assessmentMeta = {
     icon: Calculator,
     accent: 'from-violet-400 to-fuchsia-500',
     badge: 'bg-violet-400/10 text-violet-300 ring-violet-400/20',
+  },
+  'Practice Test': {
+    icon: BrainCircuit,
+    accent: 'from-pink-400 to-rose-500',
+    badge: 'bg-pink-400/10 text-pink-300 ring-pink-400/20',
   },
 }
 
@@ -160,6 +166,8 @@ export default function Assessment() {
       href = '/interview'
     } else if (assessment.accessKey === 'coding') {
       href = '/coding'
+    } else if (assessment.accessKey === 'Practice Test' || (assessment.questions && assessment.questions.length > 0)) {
+      href = `/quiz?assessmentId=${assessment._id}`
     }
 
     return {

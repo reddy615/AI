@@ -6,7 +6,7 @@ const assessmentSchema = new mongoose.Schema({
   accessKey: {
     type: String,
     required: true,
-    enum: ['technical', 'aptitude', 'coding', 'mockInterview'],
+    enum: ['technical', 'aptitude', 'coding', 'mockInterview', 'Practice Test'],
   },
   module: {
     type: String,
@@ -25,6 +25,7 @@ const assessmentSchema = new mongoose.Schema({
       options: { type: [String], default: [] },
       correctAnswer: { type: Number, default: 0 },
       topic: { type: String, default: '' },
+      category: { type: String, default: '' },
       marks: { type: Number, default: 1 },
       explanation: { type: String, default: '' },
     }, { _id: false })],
