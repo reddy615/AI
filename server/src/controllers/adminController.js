@@ -38,83 +38,158 @@ const pdfParse = require('pdf-parse');
 function parseQuestionsFromText(text) {
   if (!text || !String(text).trim()) return [];
 
-  const normalized = String(text).replace(/\r/g, '\n').replace(/\n{2,}/g, '\n\n').trim();
-
-  // Find question start indices using numbering like '1. '
-  const startRegex = /(^|\n)\s*(\d+)\.\s*/g;
-  const starts = [];
-  let m;
-  while ((m = startRegex.exec(normalized)) !== null) {
-    starts.push(m.index + (m[1] ? m[1].length : 0));
-  }
-
-  if (!starts.length) {
-    // No numbered questions found; try to treat entire text as one block
-    return [];
-  }
-
+  const lines = text.split('\n').map((line) => line.trim());
   const questions = [];
-  for (let i = 0; i < starts.length; i++) {
-    const start = starts[i];
-    const end = i + 1 < starts.length ? starts[i + 1] : normalized.length;
-    let block = normalized.slice(start, end).trim();
-    // remove leading numbering
-    block = block.replace(/^\s*\d+\.\s*/i, '').trim();
+  let currentSection = 'General';
+  let currentQuestion = null;
+  let parsingState = 'none'; // 'none', 'question_text', 'options', 'explanation'
 
-    // extract Answer line
-    const answerMatch = block.match(/Answer\s*[:\-]?\s*([A-D0-9])/i);
-    let answerLetter = null;
-    if (answerMatch) {
-      answerLetter = String(answerMatch[1]).trim().toUpperCase();
-      // remove answer line from block
-      block = block.replace(answerMatch[0], '').trim();
+  const sectionRegexes = [
+    { name: 'Advanced Aptitude', regex: /advanced\s*aptitude/i },
+    { name: 'Verbal Ability', regex: /verbal\s*ability|verbal/i },
+    { name: 'Aptitude', regex: /quantitative\s*aptitude|aptitude/i },
+    { name: 'Reasoning', regex: /logical\s*reasoning|reasoning/i },
+    { name: 'Coding Questions', regex: /coding\s*questions|coding/i },
+  ];
+
+  const questionStartRegex = /^\s*(?:Q|Question)?\s*[-.]?\s*(\d+)\s*[\.)\-:]\s*(.*)$/i;
+  const answerRegex = /^\s*(?:Answer|Ans)\s*(?:is|[:\-]?)\s*(?:Option\s*)?\(?([A-D])\)?(?:\s+|$|\.|\))/i;
+  const explanationRegex = /^\s*(?:Explanation|Exp)\s*[:\-]\s*(.*)$/i;
+
+  function extractOptionsFromLine(line) {
+    const matches = [];
+    const regex = /(?:^|\s+)\(?([A-D])\)?\s*[\.)\-:]\s*(.*?)(?=\s+\(?[A-D]\)?\s*[\.)\-:]|$)/gi;
+    let match;
+    regex.lastIndex = 0;
+    while ((match = regex.exec(line)) !== null) {
+      matches.push({
+        letter: match[1].toUpperCase(),
+        text: match[2].trim(),
+      });
     }
+    return matches;
+  }
 
-    // extract options: lines starting with A. or A)
-    const optionRegex = /(^|\n)\s*([A-D])\s*[\.)\-:]\s*(.+?)(?=\n|$)/gi;
-    const options = [];
-    let om;
-    while ((om = optionRegex.exec(block)) !== null) {
-      options.push(om[3].trim());
-    }
+  const commitCurrentQuestion = () => {
+    if (!currentQuestion) return;
 
-    // if no options found, try a fallback: lines in ALL CAPS with trailing punctuation
-    if (!options.length) {
-      const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
-      // heuristic: find lines that start with single letter followed by dot or )
-      for (const ln of lines) {
-        const m2 = ln.match(/^([A-D])\s*[\.)\-:]\s*(.+)$/);
-        if (m2) options.push(m2[2].trim());
+    const isCodingSection = currentQuestion.topic === 'Coding Questions' || currentQuestion.topic === 'Coding';
+    const hasNoOptions = currentQuestion.options.length === 0;
+    const isCodingText = /write\s+(?:a\s+)?(?:program|function|code|algorithm|script|method)/i.test(currentQuestion.text);
+
+    if (isCodingSection || (hasNoOptions && isCodingText)) {
+      currentQuestion.type = 'coding';
+      currentQuestion.topic = 'Coding';
+      currentQuestion.category = 'Coding';
+      currentQuestion.options = [];
+      currentQuestion.correctAnswer = null;
+    } else {
+      currentQuestion.type = 'mcq';
+      currentQuestion.options = currentQuestion.options.map((opt) => opt.trim()).filter(Boolean);
+      if (currentQuestion.options.length > 0) {
+        while (currentQuestion.options.length < 4) {
+          currentQuestion.options.push('');
+        }
       }
     }
 
-    // Remove option lines from question text
-    if (options.length) {
-      // remove common option prefixes from block
-      block = block.replace(/(^|\n)\s*[A-D]\s*[\.)\-:]\s*.+(?=\n|$)/gi, '').trim();
+    currentQuestion.text = currentQuestion.text.trim();
+    currentQuestion.question = currentQuestion.text;
+    currentQuestion.explanation = currentQuestion.explanation.trim();
+
+    questions.push(currentQuestion);
+    currentQuestion = null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+
+    // Skip page numbers and headers
+    if (/^\s*Page\s*\d+\s*(?:of\s*\d+)?\s*$/i.test(line)) {
+      continue;
     }
 
-    // Final clean: remove stray 'Answer' lines or trailing labels
-    block = block.replace(/(^|\n)\s*Answer\s*[:\-]?.*$/i, '').trim();
+    // 1. Check for Section Heading
+    let sectionMatched = false;
+    for (const sec of sectionRegexes) {
+      if (sec.regex.test(line) && line.length < 40) {
+        commitCurrentQuestion();
+        currentSection = sec.name;
+        console.log("CURRENT SECTION:", currentSection);
+        sectionMatched = true;
+        parsingState = 'none';
+        break;
+      }
+    }
+    if (sectionMatched) continue;
 
-    let correctIndex = 0;
-    if (answerLetter && /^[A-D]$/.test(answerLetter) && options.length) {
-      correctIndex = answerLetter.charCodeAt(0) - 65;
-      if (correctIndex < 0 || correctIndex >= options.length) correctIndex = 0;
+    // 2. Check for Question Start
+    const qMatch = line.match(questionStartRegex);
+    if (qMatch) {
+      const qNum = parseInt(qMatch[1], 10);
+      if (qNum > 0 && qNum <= 150) {
+        commitCurrentQuestion();
+        currentQuestion = {
+          text: qMatch[2],
+          options: [],
+          correctAnswer: 0,
+          topic: currentSection,
+          category: currentSection,
+          difficulty: 'Medium',
+          marks: 1,
+          explanation: '',
+        };
+        parsingState = 'question_text';
+        continue;
+      }
     }
 
-    const questionText = block.split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+    // 3. Check for Options (single or inline)
+    const optionsFound = extractOptionsFromLine(line);
+    if (optionsFound.length > 0 && currentQuestion) {
+      optionsFound.forEach((opt) => {
+        currentQuestion.options.push(opt.text);
+      });
+      parsingState = 'options';
+      continue;
+    }
 
-    questions.push({
-      text: questionText || 'Untitled question',
-      options: options.length ? options : [],
-      correctAnswer: correctIndex,
-      topic: '',
-      marks: 1,
-      explanation: '',
-    });
+    // 4. Check for Answer
+    const ansMatch = line.match(answerRegex);
+    if (ansMatch && currentQuestion) {
+      const ansLetter = ansMatch[1].toUpperCase();
+      const letterCode = ansLetter.charCodeAt(0) - 65;
+      currentQuestion.correctAnswer = letterCode;
+      parsingState = 'answer';
+      continue;
+    }
+
+    // 5. Check for Explanation
+    const expMatch = line.match(explanationRegex);
+    if (expMatch && currentQuestion) {
+      currentQuestion.explanation = expMatch[1];
+      parsingState = 'explanation';
+      continue;
+    }
+
+    // 6. Append to current state
+    if (currentQuestion) {
+      if (parsingState === 'question_text') {
+        currentQuestion.text += '\n' + line;
+      } else if (parsingState === 'options' && currentQuestion.options.length > 0) {
+        currentQuestion.options[currentQuestion.options.length - 1] += ' ' + line;
+      } else if (parsingState === 'explanation') {
+        currentQuestion.explanation += '\n' + line;
+      }
+    } else {
+      console.log("SKIPPED LINE (no active question):", line);
+    }
   }
 
+  commitCurrentQuestion();
+
+  console.log("TOTAL QUESTIONS PARSED:", questions.length);
   return questions;
 }
 
@@ -586,6 +661,10 @@ exports.createAssessment = asyncHandler(async (req, res) => {
     order,
   } = req.body;
 
+  if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    return sendError(res, 'At least one question is required to create an assessment', 400);
+  }
+
   const assessment = await Assessment.create({
     title,
     description: description || '',
@@ -625,6 +704,12 @@ exports.updateAssessment = asyncHandler(async (req, res) => {
   const assessment = await Assessment.findById(id);
   if (!assessment) {
     return sendError(res, 'Assessment not found', 404);
+  }
+
+  if (req.body.questions !== undefined) {
+    if (!Array.isArray(req.body.questions) || req.body.questions.length === 0) {
+      return sendError(res, 'At least one question is required to update an assessment', 400);
+    }
   }
 
   const updateFields = [

@@ -58,7 +58,13 @@ export default function Result() {
 
   const { attempt, analytics } = data
 
-  if (attempt?.module === 'aptitude' || attempt?.module === 'reasoning' || attempt?.module === 'verbal') {
+  const assessmentModule = String(attempt?.module || '').toLowerCase().trim();
+  if (
+    assessmentModule === 'aptitude' ||
+    assessmentModule === 'reasoning' ||
+    assessmentModule === 'verbal' ||
+    assessmentModule === 'practice test'
+  ) {
     return (
       <AptitudeResultAnalytics
         attempt={attempt}

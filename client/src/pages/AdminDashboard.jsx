@@ -1481,15 +1481,19 @@ export default function AdminDashboard() {
                         setParsedQuestions(qs)
                         if (qs.length) {
                           // merge parsed questions into drafts for review
-                          const nextDrafts = qs.map((q) => ({
-                            id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
-                            text: q.text || '',
-                            options: q.options && q.options.length ? q.options : ['', '', '', ''],
-                            correctAnswer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 0,
-                            topic: q.topic || '',
-                            marks: q.marks || '1',
-                            explanation: q.explanation || '',
-                          }))
+                          const nextDrafts = qs.map((q) => {
+                            const isCoding = q.type === 'coding' || q.topic === 'Coding' || q.category === 'Coding';
+                            return {
+                              id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+                              text: q.text || q.question || '',
+                              options: q.options && q.options.length ? q.options : (isCoding ? [] : ['', '', '', '']),
+                              correctAnswer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 0,
+                              topic: q.topic || '',
+                              category: q.category || q.topic || '',
+                              marks: q.marks || '1',
+                              explanation: q.explanation || '',
+                            };
+                          })
                           setQuestionDrafts((current) => [...current, ...nextDrafts])
                         } else {
                           setPdfParseError('No questions were parsed from the PDF. Please verify the file format.')

@@ -282,7 +282,13 @@ function BadgePill({ children }) {
 export function AptitudeResultAnalytics({ attempt, analytics, history = [], gamification = null, onBack, module }) {
   const [showAnswers, setShowAnswers] = useState(false)
   const assessmentModule = (module || attempt?.module || 'aptitude').toLowerCase()
-  const moduleLabel = assessmentModule === 'reasoning' ? 'Reasoning' : assessmentModule === 'verbal' ? 'Verbal' : 'Aptitude'
+  const moduleLabel = assessmentModule === 'reasoning'
+    ? 'Reasoning'
+    : assessmentModule === 'verbal'
+    ? 'Verbal'
+    : assessmentModule === 'practice test'
+    ? 'Practice Test'
+    : 'Aptitude'
 
   const model = useMemo(() => buildAptitudeAnalytics({ attempt, analytics, history, gamification }), [attempt, analytics, history, gamification])
 
@@ -602,6 +608,7 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
                     const isCorrect = !isSkipped && Number(selectedIndex) === Number(answer.correctIndex)
                     const selectedAnswer = answer.selectedAnswer || (isSkipped ? 'Skipped' : `Option ${Number(selectedIndex) + 1}`)
                     const correctAnswer = answer.correctAnswer || `Option ${Number(answer.correctIndex) + 1}`
+                    const isCoding = answer.correctAnswer === 'Coding Submission' || answer.topic === 'Coding' || answer.category === 'Coding';
 
                     return (
                       <motion.article
@@ -620,9 +627,16 @@ export function AptitudeResultAnalytics({ attempt, analytics, history = [], gami
                               {answer.topic ? <BadgePill>{answer.topic}</BadgePill> : null}
                             </div>
                           </div>
-                          <div className="grid min-w-[16rem] gap-2 text-sm">
+                          <div className="grid min-w-[16rem] lg:min-w-[24rem] gap-2 text-sm">
                             <div className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-white/75">
-                              <span className="text-white/45">Your answer:</span> {selectedAnswer}
+                              <span className="text-white/45 block mb-1">Your answer:</span>
+                              {isCoding && !isSkipped ? (
+                                <pre className="font-mono text-xs overflow-x-auto max-h-40 p-2 bg-slate-950/80 rounded border border-white/5 whitespace-pre-wrap text-cyan-300">
+                                  {selectedAnswer}
+                                </pre>
+                              ) : (
+                                <span>{selectedAnswer}</span>
+                              )}
                             </div>
                             <div className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-white/75">
                               <span className="text-white/45">Correct answer:</span> {correctAnswer}

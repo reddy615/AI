@@ -1,6 +1,13 @@
-import { Activity, ArrowUpRight, Award, BarChart3, BadgeCheck, BrainCircuit, Calculator, Clock3, Flame, Lightbulb, Percent, PieChart, Radar, Scale, Sparkles, Sigma, Target, TrendingUp, Trophy } from 'lucide-react'
+import { Activity, ArrowUpRight, Award, BarChart3, BadgeCheck, BrainCircuit, Calculator, Clock3, Flame, Lightbulb, Percent, PieChart, Radar, Scale, Sparkles, Sigma, Target, TrendingUp, Trophy, Code2 } from 'lucide-react'
 
 export const topicIconMap = {
+  Coding: Code2,
+  Aptitude: Calculator,
+  'Verbal Ability': Lightbulb,
+  Verbal: Lightbulb,
+  Reasoning: BrainCircuit,
+  'Logical Reasoning': BrainCircuit,
+  'Advanced Aptitude': Award,
   Percentages: Percent,
   'Ratios and Proportions': Scale,
   Averages: Sigma,
@@ -66,12 +73,12 @@ function calculateTopicAccuracy(topicStats) {
   return Math.round((safeNumber(topicStats.correct) / total) * 100)
 }
 
-function buildTopicHistorySeries(topic, history = [], fallbackAccuracy = 0) {
-  const aptitudeAttempts = (Array.isArray(history) ? history : [])
-    .filter((attempt) => attempt?.module === 'aptitude')
+function buildTopicHistorySeries(topic, history = [], fallbackAccuracy = 0, currentModule = 'aptitude') {
+  const matchedAttempts = (Array.isArray(history) ? history : [])
+    .filter((attempt) => String(attempt?.module || '').toLowerCase().trim() === String(currentModule || 'aptitude').toLowerCase().trim())
     .slice(-6)
 
-  const series = aptitudeAttempts.map((attempt) => {
+  const series = matchedAttempts.map((attempt) => {
     const answers = Array.isArray(attempt.answers) ? attempt.answers : []
     const topicAnswers = answers.filter((answer) => (answer.topic || answer.questionId?.topic) === topic)
     const total = topicAnswers.length
@@ -91,11 +98,12 @@ function buildTopicHistorySeries(topic, history = [], fallbackAccuracy = 0) {
 }
 
 function buildOverallTrend(history = [], currentAttempt = {}) {
-  const aptitudeAttempts = (Array.isArray(history) ? history : [])
-    .filter((attempt) => attempt?.module === 'aptitude')
+  const currentModule = String(currentAttempt?.module || 'aptitude').toLowerCase().trim();
+  const matchedAttempts = (Array.isArray(history) ? history : [])
+    .filter((attempt) => String(attempt?.module || '').toLowerCase().trim() === currentModule)
     .slice(-8)
 
-  const data = aptitudeAttempts.map((attempt, index) => {
+  const data = matchedAttempts.map((attempt, index) => {
     const answers = Array.isArray(attempt.answers) ? attempt.answers : []
     const total = Math.max(
       safeNumber(attempt.totalQuestions),
@@ -153,7 +161,7 @@ export function buildAptitudeAnalytics({ attempt = {}, analytics = {}, history =
       skipped: safeNumber(stats.skipped),
       score: safeNumber(stats.score),
       total: Math.max(safeNumber(stats.total), 1),
-      sparkline: buildTopicHistorySeries(topic, history, topicAccuracy),
+      sparkline: buildTopicHistorySeries(topic, history, topicAccuracy, attempt?.module || 'aptitude'),
     }
   })
 
@@ -260,4 +268,5 @@ export const supportedTopicIcons = {
   Award,
   BadgeCheck,
   Lightbulb,
+  Code2,
 }

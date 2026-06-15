@@ -173,11 +173,14 @@ function scoreQuizAnswers(questionsById, answers) {
       continue;
     }
 
-    const selectedIndex = selectedValue === null || selectedValue === undefined
+    const isCoding = !question.options || question.options.length === 0;
+    const isSkipped = selectedValue === null || selectedValue === undefined || (isCoding && String(selectedValue).trim() === '');
+    const selectedIndex = isSkipped
       ? null
-      : Number(selectedValue);
-    const isSkipped = selectedIndex === null;
-    const isCorrect = !isSkipped && selectedIndex === Number(question.correctIndex);
+      : isCoding
+        ? 0
+        : Number(selectedValue);
+    const isCorrect = !isSkipped && (isCoding ? true : selectedIndex === Number(question.correctIndex));
     const answerScore = isSkipped
       ? 0
       : isCorrect
@@ -200,9 +203,9 @@ function scoreQuizAnswers(questionsById, answers) {
       category: question.category,
       topic: question.topic || question.category || 'General',
       selectedIndex,
-      selectedAnswer: isSkipped ? null : question.options?.[selectedIndex]?.text || null,
+      selectedAnswer: isSkipped ? null : (isCoding ? selectedValue : question.options?.[selectedIndex]?.text || null),
       correctIndex: question.correctIndex,
-      correctAnswer: question.options?.[question.correctIndex]?.text || null,
+      correctAnswer: question.correctAnswer || (isCoding ? 'Coding Submission' : question.options?.[question.correctIndex]?.text || null),
       isCorrect,
       isSkipped,
       marks: asNumber(question.marks),
