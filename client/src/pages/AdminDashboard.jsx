@@ -1150,15 +1150,17 @@ export default function AdminDashboard() {
     )
 
     return (
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="flex flex-wrap gap-4 items-center">
         <div
-          className={`flex min-w-[8.25rem] items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-all duration-300 ${
+          className={`flex items-center justify-between min-w-[190px] px-4 py-3 rounded-xl border transition-all duration-300 gap-3 ${
             isAllSelected
               ? 'border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.15)]'
               : 'border-slate-700/80 bg-slate-950/70'
           }`}
         >
-          <span className={`text-xs font-bold ${isAllSelected ? 'text-cyan-300' : 'text-slate-300'}`}>Access All</span>
+          <span className={`text-xs font-bold whitespace-nowrap ${isAllSelected ? 'text-cyan-300' : 'text-slate-300'}`}>
+            Access All
+          </span>
           <button
             type="button"
             role="switch"
@@ -1189,9 +1191,11 @@ export default function AdminDashboard() {
           return (
             <div
               key={assessment.key}
-              className="flex min-w-[8.25rem] items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-950/70 px-3 py-2"
+              className="flex items-center justify-between min-w-[170px] px-4 py-3 rounded-xl border border-slate-700/80 bg-slate-950/70 gap-3"
             >
-              <span className="text-xs font-medium text-slate-300">{assessment.shortTitle}</span>
+              <span className="text-xs font-medium text-slate-300 whitespace-nowrap">
+                {assessment.shortTitle}
+              </span>
               <button
                 type="button"
                 role="switch"
