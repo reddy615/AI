@@ -1135,16 +1135,16 @@ export default function AdminDashboard() {
                 aria-label={`${enabled ? 'Disable' : 'Enable'} ${assessment.title} for ${user.name}`}
                 disabled={bulkAssessmentUpdating || userIsUpdating}
                 onClick={() => updateAssessmentAccess(user, assessment.key)}
-                className={`relative h-5 w-9 shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-wait disabled:opacity-60 ${
-                  enabled ? 'bg-cyan-500' : 'bg-slate-600'
+                className={`relative h-[26px] w-[48px] shrink-0 rounded-full transition-all duration-[250ms] ease-in-out focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-wait disabled:opacity-60 overflow-hidden ${
+                  enabled ? 'bg-cyan-500' : 'bg-slate-700'
                 }`}
               >
                 {updating ? (
-                  <LoaderCircle className="absolute left-2.5 top-1 h-3 w-3 animate-spin text-white" />
+                  <LoaderCircle className="absolute left-[16px] top-[5px] h-4 w-4 animate-spin text-white" />
                 ) : (
                   <span
-                    className={`absolute top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
-                      enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    className={`absolute top-[3px] left-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-[250ms] ease-in-out ${
+                      enabled ? 'translate-x-[22px]' : 'translate-x-0'
                     }`}
                   />
                 )}
