@@ -495,10 +495,24 @@ export default function AdminDashboard() {
     }
 
     const previousAccess = normalizeAssessmentAccess(user.assessmentAccess)
-    const nextValue = !previousAccess[assessmentKey]
+
+    let updatePayload = {}
+    let nextValue
+
+    if (assessmentKey === 'ALL') {
+      const isCurrentlyAllSelected = assessmentOptions.every((opt) => previousAccess[opt.key])
+      nextValue = !isCurrentlyAllSelected
+      assessmentOptions.forEach((opt) => {
+        updatePayload[opt.key] = nextValue
+      })
+    } else {
+      nextValue = !previousAccess[assessmentKey]
+      updatePayload[assessmentKey] = nextValue
+    }
+
     const optimisticAccess = {
       ...previousAccess,
-      [assessmentKey]: nextValue,
+      ...updatePayload,
     }
 
     setAssessmentUpdating((current) => ({ ...current, [updateKey]: true }))
@@ -507,33 +521,40 @@ export default function AdminDashboard() {
         ? { ...item, assessmentAccess: optimisticAccess }
         : item
     )))
+
     setAssessmentSummary((current) => {
-      if (!current?.assessments?.[assessmentKey]) return current
+      if (!current?.assessments) return current
 
-      const currentAssessment = current.assessments[assessmentKey]
-      const usersWithAccess = Math.max(
-        0,
-        Number(currentAssessment.usersWithAccess || 0) + (nextValue ? 1 : -1)
-      )
+      const nextAssessments = { ...current.assessments }
+      let hasChanges = false
 
-      return {
-        ...current,
-        assessments: {
-          ...current.assessments,
-          [assessmentKey]: {
-            ...currentAssessment,
+      Object.keys(updatePayload).forEach((key) => {
+        const assessmentInfo = nextAssessments[key]
+        if (!assessmentInfo) return
+
+        const wasEnabled = previousAccess[key]
+        const isEnabled = updatePayload[key]
+
+        if (wasEnabled !== isEnabled) {
+          const usersWithAccess = Math.max(
+            0,
+            Number(assessmentInfo.usersWithAccess || 0) + (isEnabled ? 1 : -1)
+          )
+          nextAssessments[key] = {
+            ...assessmentInfo,
             usersWithAccess,
             active: usersWithAccess > 0,
-          },
-        },
-      }
+          }
+          hasChanges = true
+        }
+      })
+
+      return hasChanges ? { ...current, assessments: nextAssessments } : current
     })
 
     try {
       const response = await api.put(`/api/admin/users/${userId}/assessment-access`, {
-        assessmentAccess: {
-          [assessmentKey]: nextValue,
-        },
+        assessmentAccess: updatePayload,
       })
       const payload = response.data?.data || response.data
       const updatedAccess = normalizeAssessmentAccess(payload?.assessmentAccess || optimisticAccess)
@@ -558,27 +579,37 @@ export default function AdminDashboard() {
           ? { ...item, assessmentAccess: previousAccess }
           : item
       )))
+
       setAssessmentSummary((current) => {
-        if (!current?.assessments?.[assessmentKey]) return current
+        if (!current?.assessments) return current
 
-        const currentAssessment = current.assessments[assessmentKey]
-        const usersWithAccess = Math.max(
-          0,
-          Number(currentAssessment.usersWithAccess || 0) + (nextValue ? -1 : 1)
-        )
+        const nextAssessments = { ...current.assessments }
+        let hasChanges = false
 
-        return {
-          ...current,
-          assessments: {
-            ...current.assessments,
-            [assessmentKey]: {
-              ...currentAssessment,
+        Object.keys(updatePayload).forEach((key) => {
+          const assessmentInfo = nextAssessments[key]
+          if (!assessmentInfo) return
+
+          const wasEnabled = previousAccess[key]
+          const attemptedValue = updatePayload[key]
+
+          if (wasEnabled !== attemptedValue) {
+            const usersWithAccess = Math.max(
+              0,
+              Number(assessmentInfo.usersWithAccess || 0) + (wasEnabled ? 1 : -1)
+            )
+            nextAssessments[key] = {
+              ...assessmentInfo,
               usersWithAccess,
               active: usersWithAccess > 0,
-            },
-          },
-        }
+            }
+            hasChanges = true
+          }
+        })
+
+        return hasChanges ? { ...current, assessments: nextAssessments } : current
       })
+
       const message = requestError.response?.data?.message || 'Unable to update assessment access'
       toast.error(message)
     } finally {
@@ -1112,12 +1143,45 @@ export default function AdminDashboard() {
   const renderUserAssessmentControls = (user) => {
     const userId = user._id || user.id
     const access = normalizeAssessmentAccess(user.assessmentAccess)
+    const isAllSelected = assessmentOptions.every((opt) => access[opt.key])
+
     const userIsUpdating = Object.keys(assessmentUpdating).some(
       (key) => key.startsWith(`${userId}:`)
     )
 
     return (
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div
+          className={`flex min-w-[8.25rem] items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-all duration-300 ${
+            isAllSelected
+              ? 'border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+              : 'border-slate-700/80 bg-slate-950/70'
+          }`}
+        >
+          <span className={`text-xs font-bold ${isAllSelected ? 'text-cyan-300' : 'text-slate-300'}`}>Access All</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isAllSelected}
+            aria-label={`${isAllSelected ? 'Disable' : 'Enable'} all assessments for ${user.name}`}
+            disabled={bulkAssessmentUpdating || userIsUpdating}
+            onClick={() => updateAssessmentAccess(user, 'ALL')}
+            className={`relative h-[26px] w-[48px] shrink-0 rounded-full transition-all duration-[250ms] ease-in-out focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-wait disabled:opacity-60 overflow-hidden ${
+              isAllSelected ? 'bg-cyan-500' : 'bg-slate-700'
+            }`}
+          >
+            {Boolean(assessmentUpdating[`${userId}:ALL`]) ? (
+              <LoaderCircle className="absolute left-[16px] top-[5px] h-4 w-4 animate-spin text-white" />
+            ) : (
+              <span
+                className={`absolute top-[3px] left-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-[250ms] ease-in-out ${
+                  isAllSelected ? 'translate-x-[22px]' : 'translate-x-0'
+                }`}
+              />
+            )}
+          </button>
+        </div>
+
         {assessmentOptions.map((assessment) => {
           const enabled = access[assessment.key]
           const updating = Boolean(assessmentUpdating[`${userId}:${assessment.key}`])
