@@ -3,8 +3,18 @@ import Editor, { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import api from '../api/api'
 import Skeleton from '../components/Skeleton'
-import LoadingOverlay from '../components/LoadingOverlay'
 import { useToast } from '../components/ToastProvider'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  ChevronLeft, 
+  Play, 
+  Send, 
+  Timer, 
+  Settings, 
+  CheckCircle2,
+  XCircle,
+  Terminal
+} from 'lucide-react'
 
 // Force Monaco to load from local bundle files instead of external CDN.
 loader.config({ monaco })
@@ -30,23 +40,35 @@ function getChallengeDescription(prompt = '') {
 }
 
 export default function CodingAssessment() {
+  const [view, setView] = useState('dashboard') // dashboard or workspace
   const [challenges, setChallenges] = useState([])
-  const [selectedChallengeId, setSelectedChallengeId] = useState(null)
   const [challenge, setChallenge] = useState(null)
   const [language, setLanguage] = useState('javascript')
-  const [sourceCode, setSourceCode] = useState('// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
+  const [sourceCode, setSourceCode] = useState('')
+  const [editorTheme, setEditorTheme] = useState('vs-dark')
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [timeRemaining, setTimeRemaining] = useState(0)
   const toast = useToast()
-  const [submission, setSubmission] = useState(null)
+  const [results, setResults] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
-  const [editorReady, setEditorReady] = useState(false)
-  const [editorTimedOut, setEditorTimedOut] = useState(false)
-  const [runError, setRunError] = useState('')
+
+  // Timer Logic
+  useEffect(() => {
+    if (view === 'workspace' && timeRemaining > 0) {
+      const timer = setInterval(() => setTimeRemaining(prev => prev - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [view, timeRemaining])
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s < 10 ? '0' : ''}${s}`
+  }
 
   const loadChallenges = useCallback(async () => {
     setLoading(true)
-    console.log('[coding] frontend loadChallenges:start')
     try {
       const [challengeResponse, leaderboardResponse] = await Promise.all([
         api.get('/api/coding/challenges?limit=12'),
@@ -56,17 +78,10 @@ export default function CodingAssessment() {
       const challengeList = challengeResponse.data.data?.challenges || challengeResponse.data.challenges || []
       const leaderboardList = leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || []
 
-      console.log('[coding] frontend challenge API response', {
-        challengeCount: challengeList.length,
-        leaderboardCount: leaderboardList.length,
-        firstChallengeId: challengeList[0]?._id || null,
-      })
-
       setChallenges(challengeList)
       setLeaderboard(leaderboardList)
     } catch (error) {
-      console.error(error)
-      toast.error('Unable to load challenges. Please refresh the page.')
+      toast.error('Failed to load challenges')
     } finally {
       setLoading(false)
     }
@@ -76,98 +91,25 @@ export default function CodingAssessment() {
     loadChallenges()
   }, [loadChallenges])
 
-  useEffect(() => {
-    console.log('[coding] frontend challenges state', {
-      loading,
-      count: challenges.length,
-      firstChallengeId: challenges[0]?._id || null,
-    })
-  }, [loading, challenges])
-
-  useEffect(() => {
-    if (!challenges.length) {
-      setChallenge(null)
-      setSelectedChallengeId(null)
-      console.log('[coding] frontend selectedChallenge state', { selectedChallengeId: null, challengeId: null })
-      return
-    }
-
-    const selected = selectedChallengeId ? challenges.find((item) => item._id === selectedChallengeId) : null
-    const challengeToUse = selected || challenges[0]
-
-    if (challengeToUse) {
-      if (challengeToUse._id !== selectedChallengeId) {
-        setSelectedChallengeId(challengeToUse._id)
-      }
-
-      if (!challenge || challenge._id !== challengeToUse._id) {
-        setChallenge(challengeToUse)
-        setLanguage(normalizeLanguage(challengeToUse.language))
-        setSourceCode(challengeToUse.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
-        setSubmission(null)
-        setRunError('')
-      }
-
-      console.log('[coding] frontend selectedChallenge state', {
-        selectedChallengeId: challengeToUse._id,
-        challengeId: challengeToUse._id,
-        title: challengeToUse.title,
-      })
-    }
-  }, [challenge, challenges, selectedChallengeId])
-
-  useEffect(() => {
-    if (editorReady) {
-      setEditorTimedOut(false)
-      return
-    }
-
-    const timeout = window.setTimeout(() => {
-      setEditorTimedOut(true)
-    }, 8000)
-
-    return () => {
-      window.clearTimeout(timeout)
-    }
-  }, [editorReady])
-
   const startChallenge = async (challengeId) => {
-    setSelectedChallengeId(challengeId)
-    console.log('[coding] frontend startChallenge', { challengeId })
+    setLoading(true)
     try {
       const response = await api.get(`/api/coding/challenges/${challengeId}`)
       const selected = response.data.data?.challenge || response.data.challenge
-      console.log('[coding] frontend challenge API response (single)', {
-        challengeId: selected?._id || null,
-        title: selected?.title || null,
-      })
       setChallenge(selected)
       setLanguage(normalizeLanguage(selected?.language))
       setSourceCode(selected?.starterCode || '// Write your solution here\nfunction solve(input) {\n  return input;\n}\n')
-      setSubmission(null)
-      setRunError('')
+      setResults(null)
+      setTimeRemaining((selected.timeLimitMinutes || 30) * 60)
+      setView('workspace')
     } catch (error) {
-      console.error(error)
+      toast.error('Failed to load challenge details')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const runCode = async () => {
-    console.log('[coding] frontend runCode:start', {
-      selectedChallengeId,
-      challengeId: challenge?._id || null,
-      language,
-      sourceLength: sourceCode.length,
-    })
-    if (!challenge) {
-      setRunError('Please select a challenge before running your code.')
-      return
-    }
-    if (!sourceCode.trim()) {
-      setRunError('Source code cannot be empty.')
-      return
-    }
-
-    setRunError('')
+  const handleSubmit = async (isSubmission = false) => {
     setSubmitting(true)
     try {
       const response = await api.post('/api/coding/run', {
@@ -176,255 +118,305 @@ export default function CodingAssessment() {
         sourceCode,
       })
       const payload = response.data.data || response.data
-      setSubmission(payload)
-      console.log('[coding] frontend runCode:success', {
-        status: payload.status,
-        score: payload.score,
-        runtimeMs: payload.runtimeMs,
-      })
-      const leaderboardResponse = await api.get('/api/coding/leaderboard')
-      setLeaderboard(leaderboardResponse.data.data?.leaderboard || leaderboardResponse.data.leaderboard || [])
+      setResults(payload)
+      setConsoleOpen(true)
+      if (isSubmission) {
+        toast.success(`Submission ${payload.status.toUpperCase()}! Score: ${payload.score}`)
+      }
     } catch (error) {
-      console.error(error)
-      const message = error.response?.data?.message || error.response?.data?.error || error.message || 'Unable to run code right now.'
-      toast.error(message)
-      setRunError(message)
+      toast.error('Execution failed. Check your internet connection.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const selectedTags = useMemo(() => challenge?.tags || [], [challenge])
-  const editorLanguage = useMemo(() => (language === 'c' ? 'cpp' : language), [language])
-  const challengeDescription = useMemo(() => getChallengeDescription(challenge?.prompt), [challenge])
+  const filteredChallenges = challenges.filter(c => {
+    const matchSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchDiff = filterDifficulty === 'all' || c.difficulty === filterDifficulty
+    return matchSearch && matchDiff
+  })
 
-  useEffect(() => {
-    console.log('[coding] frontend selectedChallenge state', {
-      selectedChallengeId,
-      challengeId: challenge?._id || null,
-      challengeTitle: challenge?.title || null,
-    })
-  }, [selectedChallengeId, challenge])
-
-  return (
-    <div className="space-y-8 relative">
-      <LoadingOverlay
-        visible={loading || submitting}
-        title={submitting ? 'Running Code' : 'Loading Coding Lab'}
-        subtitle={submitting ? 'Executing your solution and updating the leaderboard.' : 'Preparing the coding assessment environment.'}
-      />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+  const renderDashboard = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto py-8 px-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <p className="text-sm uppercase tracking-[0.25em] text-violet-600">Coding Lab</p>
-          <h1 className="text-3xl font-bold text-slate-900">Monaco-Based Coding Assessment</h1>
-          <p className="mt-2 text-sm text-slate-500">Run code, evaluate test cases, and track results on the leaderboard.</p>
+          <h1 className="text-3xl font-bold text-slate-900">Challenges</h1>
+          <p className="text-slate-500 mt-1">Master your coding skills with curated problems.</p>
         </div>
-        <button onClick={loadChallenges} className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Refresh Challenges</button>
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search problems..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900/5 transition"
+            />
+          </div>
+          <select 
+            value={filterDifficulty}
+            onChange={(e) => setFilterDifficulty(e.target.value)}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white outline-none"
+          >
+            <option value="all">All Difficulties</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
       </div>
 
-      <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-slate-900">Challenges</h3>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{challenges.length} loaded</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {loading ? (
-              Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20" />)
-            ) : challenges.length ? (
-              challenges.map((item) => (
-                <button
-                  key={item._id}
-                  onClick={() => startChallenge(item._id)}
-                  className={`w-full rounded-xl border p-4 text-left transition ${selectedChallengeId === item._id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-900'}`}
-                >
-                  <div className="text-xs uppercase tracking-[0.18em] opacity-70">{item.language} · {item.difficulty}</div>
-                  <div className="mt-1 font-semibold">{item.title}</div>
-                  <div className="mt-2 text-xs opacity-75">{item.timeLimitMinutes} min</div>
-                </button>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">Add coding challenges to start using the lab.</div>
-            )}
-          </div>
-        </aside>
-
-        <main className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            {challenge ? (
-              <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-sm uppercase tracking-[0.18em] text-slate-500">{challenge.language} · {challenge.difficulty}</div>
-                    <h2 className="mt-2 text-2xl font-bold text-slate-900">{challenge.title}</h2>
-                    <p className="mt-3 text-sm text-slate-600 whitespace-pre-wrap">{challengeDescription}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{tag}</span>
+      <div className="grid gap-4">
+        {filteredChallenges.map(c => (
+          <button
+            key={c._id}
+            onClick={() => startChallenge(c._id)}
+            className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl hover:border-slate-900 transition-all group"
+          >
+            <div className="flex items-center gap-6">
+              <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-slate-900 transition-colors">
+                <Terminal className="h-5 w-5 text-slate-400 group-hover:text-white" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-slate-900">{c.title}</h3>
+                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                  <span className={`capitalize font-semibold ${
+                    c.difficulty === 'easy' ? 'text-emerald-500' : 
+                    c.difficulty === 'medium' ? 'text-amber-500' : 'text-rose-500'
+                  }`}>{c.difficulty}</span>
+                  <span>•</span>
+                  <span>{c.language}</span>
+                  <span>•</span>
+                  <div className="flex gap-1">
+                    {c.tags?.slice(0, 2).map(t => (
+                      <span key={t} className="bg-slate-100 px-2 py-0.5 rounded text-[10px] uppercase font-bold">{t}</span>
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-8">
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-bold text-slate-900">82%</div>
+                <div className="text-[10px] uppercase font-bold text-slate-400">Acceptance</div>
+              </div>
+              <div className="h-8 w-8 rounded-full border border-slate-200 flex items-center justify-center group-hover:bg-slate-900 group-hover:border-slate-900 transition-all">
+                <ChevronLeft className="h-4 w-4 rotate-180 text-slate-400 group-hover:text-white" />
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  )
 
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Time Limit</div><div className="mt-1 text-lg font-semibold text-slate-900">{challenge.timeLimitMinutes} min</div></div>
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Expected Complexity</div><div className="mt-1 text-lg font-semibold text-slate-900">{challenge.expectedComplexity || 'n/a'}</div></div>
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Sample Input</div><div className="mt-1 text-sm font-mono text-slate-700">{challenge.sampleInput || '-'}</div></div>
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Sample Output</div><div className="mt-1 text-sm font-mono text-slate-700">{challenge.sampleOutput || '-'}</div></div>
+  const [activeTab, setActiveTab] = useState('description') // description, submissions, solution
+  const [consoleOpen, setConsoleOpen] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDifficulty, setFilterDifficulty] = useState('all')
+  const renderWorkspace = () => (
+    <div className="h-screen flex flex-col bg-[#1e1e1e] text-white overflow-hidden">
+      {/* Workspace Header */}
+      <header className="h-14 border-b border-white/10 flex items-center justify-between px-4 shrink-0 bg-[#252526]">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setView('dashboard')} className="p-2 hover:bg-white/10 rounded-lg transition">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="h-6 w-[1px] bg-white/10" />
+          <h2 className="font-bold text-sm truncate max-w-[200px]">{challenge?.title}</h2>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
+            <Timer className="h-4 w-4 text-cyan-400" />
+            <span className="text-xs font-mono font-bold">{formatTime(timeRemaining)}</span>
+          </div>
+          <select 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            className="bg-[#2d2d2d] border border-white/10 text-xs px-3 py-1.5 rounded-lg outline-none"
+          >
+            {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+          </select>
+          <button onClick={() => setEditorTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')} className="p-2 hover:bg-white/10 rounded-lg">
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={submitting} 
+            onClick={() => handleSubmit(false)}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-lg text-sm font-bold transition disabled:opacity-50"
+          >
+            <Play className="h-4 w-4" /> Run
+          </button>
+          <button 
+            disabled={submitting} 
+            onClick={() => handleSubmit(true)}
+            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 px-4 py-1.5 rounded-lg text-sm font-bold transition disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" /> Submit
+          </button>
+        </div>
+      </header>
+
+      {/* Main Workspace Split */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Description */}
+        <div className="w-1/2 flex flex-col border-r border-white/10 bg-[#1e1e1e]">
+          <div className="flex border-b border-white/10 shrink-0">
+            {['description', 'submissions', 'solution'].map(t => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={`px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all relative ${
+                  activeTab === t ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {t}
+                {activeTab === t && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            {activeTab === 'description' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    challenge.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                  }`}>
+                    {challenge.difficulty}
+                  </span>
+                  <div className="h-1 w-1 rounded-full bg-white/20" />
+                  <div className="flex gap-2">
+                    {challenge.tags?.map(t => <span key={t} className="text-[10px] text-slate-500 font-bold uppercase">#{t}</span>)}
+                  </div>
+                </div>
+                <h1 className="text-2xl font-bold">{challenge.title}</h1>
+                <div className="prose prose-invert text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                  {getChallengeDescription(challenge.prompt)}
                 </div>
 
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-sm font-semibold text-slate-900">Examples</div>
-                    <div className="mt-3 space-y-3 text-sm text-slate-700">
-                      <div>
-                        <div className="text-xs uppercase text-slate-500">Input</div>
-                        <pre className="mt-1 whitespace-pre-wrap font-mono">{challenge.sampleInput || '-'}</pre>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase text-slate-500">Expected Output</div>
-                        <pre className="mt-1 whitespace-pre-wrap font-mono">{challenge.sampleOutput || '-'}</pre>
-                      </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase text-slate-500 tracking-widest">Example 1</h4>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 font-mono text-sm">
+                    <div className="text-slate-500 mb-1">Input:</div>
+                    <div>{challenge.sampleInput}</div>
+                    <div className="text-slate-500 mt-3 mb-1">Output:</div>
+                    <div>{challenge.sampleOutput}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase text-slate-500 tracking-widest">Constraints</h4>
+                  <ul className="list-disc list-inside space-y-2 text-sm text-slate-400">
+                    {challenge.constraints?.map((c, i) => <li key={i}>{c}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel: Editor + Console */}
+        <div className="w-1/2 flex flex-col relative">
+          <div className="flex-1 bg-[#1e1e1e]">
+            <Editor
+              height="100%"
+              language={language === 'c' ? 'cpp' : language}
+              theme={editorTheme}
+              value={sourceCode}
+              onChange={(val) => setSourceCode(val)}
+              options={{
+                fontSize: 14,
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                automaticLayout: true,
+                padding: { top: 20 }
+              }}
+            />
+          </div>
+
+          {/* Console Drawer */}
+          <motion.div 
+            animate={{ height: consoleOpen ? '35%' : '44px' }}
+            className="bg-[#1e1e1e] border-t border-white/10 flex flex-col overflow-hidden"
+          >
+            <button 
+              onClick={() => setConsoleOpen(!consoleOpen)}
+              className="h-11 flex items-center justify-between px-4 shrink-0 hover:bg-white/5 transition"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                <Terminal className="h-4 w-4" /> Console
+              </div>
+              <div className={`h-2 w-2 rounded-full ${submitting ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+            </button>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-[#1a1a1a]">
+              {results ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className={`text-xl font-bold flex items-center gap-2 ${
+                      results.status === 'accepted' ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {results.status === 'accepted' ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
+                      {results.status.toUpperCase()}
+                    </div>
+                    <div className="flex gap-4 text-xs font-mono text-slate-500">
+                      <span>Runtime: {results.runtimeMs}ms</span>
+                      <span>Memory: {results.memoryKb || 0}KB</span>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-sm font-semibold text-slate-900">Constraints</div>
-                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                      {(challenge.constraints || []).length ? challenge.constraints.map((constraint, index) => (
-                        <li key={`${constraint}-${index}`} className="flex gap-2">
-                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
-                          <span>{constraint}</span>
-                        </li>
-                      )) : <li className="text-slate-500">No constraints provided.</li>}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-900">Public Test Cases</div>
-                    <span className="text-xs uppercase tracking-[0.18em] text-slate-500">{challenge.testCases?.length || 0} cases</span>
-                  </div>
-                  <div className="mt-3 space-y-3">
-                    {(challenge.testCases || []).length ? challenge.testCases.map((testCase, index) => (
-                      <div key={`${index}-${testCase.input}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                        <div className="font-semibold text-slate-900">Case {index + 1}</div>
-                        <div className="mt-2 grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3">
+                    {results.testResults?.map((r, i) => (
+                      <div key={i} className={`p-4 rounded-xl border ${r.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                        <div className="flex justify-between text-xs font-bold mb-3">
+                          <span className={r.passed ? 'text-emerald-400' : 'text-rose-400'}>Case {i + 1}</span>
+                          <span className="text-slate-500 font-mono uppercase tracking-widest">{r.passed ? 'Passed' : 'Failed'}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-xs font-mono">
                           <div>
-                            <div className="text-xs uppercase text-slate-500">Input</div>
-                            <pre className="mt-1 whitespace-pre-wrap font-mono">{testCase.input}</pre>
+                            <div className="text-slate-600 mb-1 uppercase text-[10px]">Input</div>
+                            <div className="bg-black/20 p-2 rounded truncate">{r.input}</div>
                           </div>
                           <div>
-                            <div className="text-xs uppercase text-slate-500">Expected Output</div>
-                            <pre className="mt-1 whitespace-pre-wrap font-mono">{testCase.expectedOutput}</pre>
+                            <div className="text-slate-600 mb-1 uppercase text-[10px]">Output</div>
+                            <div className="bg-black/20 p-2 rounded truncate">{r.actualOutput}</div>
                           </div>
                         </div>
                       </div>
-                    )) : <div className="text-sm text-slate-500">No public test cases available.</div>}
+                    ))}
                   </div>
-                </div>
-              </>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">Select a challenge to begin.</div>
-            )}
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Code Editor</h3>
-                <p className="text-sm text-slate-500">Edit your solution and run test cases against the current challenge.</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm">
-                  {LANGUAGES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-                <button onClick={runCode} disabled={submitting} className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                  {submitting ? 'Running...' : 'Submit Code'}
-                </button>
-                <button onClick={runCode} disabled={submitting} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                  {submitting ? 'Running...' : 'Run Code'}
-                </button>
-              </div>
-            </div>
-            {runError ? (
-              <div className="border-b border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-700">
-                {runError}
-              </div>
-            ) : null}
-            <div className="h-[32rem]">
-              {editorTimedOut && !editorReady ? (
-                <div className="h-full p-4">
-                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    The Monaco editor is taking too long to load. You can still type your code below.
-                  </div>
-                  <textarea
-                    value={sourceCode}
-                    onChange={(event) => setSourceCode(event.target.value)}
-                    className="h-[27rem] w-full resize-none rounded-xl border border-slate-300 p-4 font-mono text-sm text-slate-900 outline-none focus:border-slate-500"
-                    spellCheck={false}
-                  />
                 </div>
               ) : (
-                <Editor
-                  language={editorLanguage}
-                  value={sourceCode}
-                  onMount={() => setEditorReady(true)}
-                  onChange={(value) => setSourceCode(value || '')}
-                  loading={<div className="flex h-full items-center justify-center text-slate-500">Loading editor...</div>}
-                  theme="vs-dark"
-                  options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', automaticLayout: true }}
-                />
+                <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+                  <Terminal className="h-8 w-8 opacity-20" />
+                  <span className="text-sm font-medium">Run your code to see results here.</span>
+                </div>
               )}
             </div>
-          </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  )
 
-          {submission && (
-            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900">Run Results</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Status</div><div className="mt-1 text-lg font-semibold text-slate-900">{submission.status}</div></div>
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Score</div><div className="mt-1 text-lg font-semibold text-slate-900">{submission.score}</div></div>
-                  <div className="rounded-xl bg-slate-50 p-4"><div className="text-xs uppercase text-slate-500">Runtime</div><div className="mt-1 text-lg font-semibold text-slate-900">{submission.runtimeMs} ms</div></div>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {submission.testResults?.length ? submission.testResults.map((result, index) => (
-                    <div key={index} className={`rounded-xl border p-4 ${result.passed ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="font-semibold text-slate-900">Test Case {index + 1}</div>
-                        <span className="text-xs font-semibold uppercase tracking-[0.18em]">{result.passed ? 'Passed' : 'Failed'}</span>
-                      </div>
-                      <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-                        <div><div className="text-xs uppercase text-slate-500">Input</div><pre className="mt-1 whitespace-pre-wrap font-mono text-slate-700">{result.input}</pre></div>
-                        <div><div className="text-xs uppercase text-slate-500">Expected</div><pre className="mt-1 whitespace-pre-wrap font-mono text-slate-700">{result.expectedOutput}</pre></div>
-                        <div><div className="text-xs uppercase text-slate-500">Actual</div><pre className="mt-1 whitespace-pre-wrap font-mono text-slate-700">{result.actualOutput}</pre></div>
-                      </div>
-                    </div>
-                  )) : <div className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">Run code to see per-test feedback.</div>}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900">Leaderboard Preview</h3>
-                <div className="mt-4 space-y-3">
-                  {leaderboard.length ? leaderboard.slice(0, 5).map((entry, index) => (
-                    <div key={entry.id || index} className="rounded-xl bg-slate-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold text-slate-900">#{index + 1} {entry.challenge}</div>
-                        <div className="text-lg font-bold text-slate-900">{entry.bestScore}</div>
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">{entry.language} · {entry.bestRuntimeMs || 0} ms</div>
-                    </div>
-                  )) : <div className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">Leaderboard will appear once submissions are recorded.</div>}
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-      </section>
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {loading && (
+        <LoadingOverlay 
+          visible={true} 
+          title={submitting ? 'Executing Solution' : 'Syncing Lab'} 
+          subtitle="This may take a few moments."
+        />
+      )}
+      {view === 'dashboard' ? renderDashboard() : renderWorkspace()}
     </div>
   )
 }

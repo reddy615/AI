@@ -9,6 +9,12 @@ import {
   Search,
   ShieldCheck,
   Users,
+  Code,
+  Terminal,
+  Settings,
+  Clock,
+  BookOpen,
+  BarChart3,
   Plus,
   X,
   Trash2,
@@ -145,6 +151,10 @@ export default function AdminDashboard() {
     duration: '30',
     count: '10',
     passingScore: '60',
+    starterCode: '',
+    constraints: '',
+    sampleInput: '',
+    sampleOutput: '',
     description: '',
     topics: '',
     status: true,
@@ -333,6 +343,10 @@ export default function AdminDashboard() {
       duration: String(assessment.duration || 30),
       count: String(assessment.count || 10),
       passingScore: String(assessment.passingScore || 60),
+      starterCode: assessment.starterCode || '',
+      constraints: Array.isArray(assessment.constraints) ? assessment.constraints.join('\n') : '',
+      sampleInput: assessment.sampleInput || '',
+      sampleOutput: assessment.sampleOutput || '',
       description: assessment.description || '',
       topics: Array.isArray(assessment.topics) ? assessment.topics.join(', ') : '',
       status: assessment.active !== false,
@@ -390,6 +404,10 @@ export default function AdminDashboard() {
           .map((topic) => topic.trim())
           .filter(Boolean),
         active: assessmentForm.status === true,
+        starterCode: assessmentForm.starterCode,
+        constraints: assessmentForm.constraints.split('\n').filter(Boolean),
+        sampleInput: assessmentForm.sampleInput,
+        sampleOutput: assessmentForm.sampleOutput,
         questions: questionDrafts.map((question) => ({
           text: question.text,
           options: question.options.map((option) => option || ''),
@@ -1352,6 +1370,55 @@ export default function AdminDashboard() {
                 placeholder="Short description for admins and candidates"
               />
             </label>
+
+            {assessmentForm.type === 'coding' && (
+              <div className="grid gap-4 rounded-3xl border border-slate-800 bg-slate-950/50 p-5">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-cyan-400">
+                  <Code className="h-4 w-4" /> Coding Specific Configuration
+                </h3>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-200">Starter Code</span>
+                  <textarea
+                    value={assessmentForm.starterCode}
+                    onChange={(e) => setAssessmentForm(curr => ({ ...curr, starterCode: e.target.value }))}
+                    rows="5"
+                    className="mt-2 w-full font-mono rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-emerald-400 outline-none focus:border-cyan-400"
+                    placeholder="// Starter code for candidates..."
+                  />
+                </label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-200">Constraints</span>
+                    <textarea
+                      value={assessmentForm.constraints}
+                      onChange={(e) => setAssessmentForm(curr => ({ ...curr, constraints: e.target.value }))}
+                      className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
+                      placeholder="One constraint per line..."
+                    />
+                  </label>
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-200">Sample Input</span>
+                      <input
+                        type="text"
+                        value={assessmentForm.sampleInput}
+                        onChange={(e) => setAssessmentForm(curr => ({ ...curr, sampleInput: e.target.value }))}
+                        className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-200">Sample Output</span>
+                      <input
+                        type="text"
+                        value={assessmentForm.sampleOutput}
+                        onChange={(e) => setAssessmentForm(curr => ({ ...curr, sampleOutput: e.target.value }))}
+                        className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {assessmentForm.type === 'Practice Test' ? (
               <div className="block">
